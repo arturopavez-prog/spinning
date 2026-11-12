@@ -357,7 +357,9 @@ function build(auto){
   let slots, order;
   if(auto){slots=slotsFor(songs.length);order=assign(slots,songs);}
   else{order=songs.slice();slots=slotsForGiven(order);}
-  plan=order.map((s,i)=>{const b=blk(slots[i]);return{...s,blk:slots[i],b,cad:s.bpm?cadFromBpm(s.bpm,b.cad):Math.round((b.cad[0]+b.cad[1])/2),fit:fitCost(s.bpm,slots[i])}});
+  plan=order.map((s,i)=>{const b=blk(slots[i]);let c=s.bpm?cadFromBpm(s.bpm,b.cad):null,off=false;
+    if(c==null||c<b.cad[0]-3||c>b.cad[1]+3){off=!!s.bpm;c=Math.round(Math.min(b.cad[1],Math.max(b.cad[0],c||((b.cad[0]+b.cad[1])/2))));}
+    return{...s,blk:slots[i],b,cad:c,offBeat:off,fit:fitCost(s.bpm,slots[i])}});
   if(auto){songs=order.slice();renderSongs();}
   notes(auto);renderPlan();drawChart();setPanels(0,0);pickMode();
   if(auto&&mode==="playlist")$("notes").insertAdjacentHTML("beforeend",'<div class="warn">Ojo: en modo playlist la música suena en el orden de Spotify. Reordena la playlist en Spotify como dice la tabla, o toca "Usar mi orden".</div>');
@@ -379,7 +381,7 @@ function notes(auto){
 function renderPlan(){
   $("plan").innerHTML='<tr><th>#</th><th>Canción</th><th>Bloque</th><th>Cadencia</th><th>Zona</th><th>Resistencia · posición</th></tr>'+
   plan.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.name)}<br><span class="hint">${p.bpm?p.bpm+" BPM":"BPM ?"} · ${fmt(p.dur)}</span></td>
-   <td><span class="tag" style="background:${ZCOL(p.b.zone)}">${p.b.name}</span></td><td>${p.cad} rpm</td><td>${p.b.zoneTxt}<br><span class="hint">${p.b.eff}</span></td><td>${p.b.res}<br><span class="hint">${p.b.pos}</span></td></tr>`).join("");
+   <td><span class="tag" style="background:${ZCOL(p.b.zone)}">${p.b.name}</span></td><td>${p.cad} rpm${p.offBeat?'<br><span class="hint">a tu ritmo, no al beat</span>':''}</td><td>${p.b.zoneTxt}<br><span class="hint">${p.b.eff}</span></td><td>${p.b.res}<br><span class="hint">${p.b.pos}</span></td></tr>`).join("");
 }
 
 // ---------- Gráfico ----------
