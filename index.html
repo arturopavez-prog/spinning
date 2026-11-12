@@ -71,25 +71,29 @@ button.sel{outline:3px solid var(--acc);background:#3a2615}
 <div class="safety">⚠️ Siempre con calentamiento y vuelta a la calma. Si tienes problemas cardíacos, de presión o alguna lesión, consulta a un médico antes de entrenar.</div>
 
 <section>
-  <h2><span class="n">1</span>Tus canciones</h2>
-  <div class="hint">Una por línea: <b>Artista - Canción  BPM  duración</b>. El BPM y la duración son opcionales.<br>
-  Ej: <i>Queen - Don't Stop Me Now 156 3:29</i><br>
-  🎤 Para dictar: toca el cuadro y usa el micrófono del teclado del celular.</div>
-  <textarea id="txt" placeholder="Artista - Canción 128 4:05"></textarea>
-  <div class="hint" style="margin-top:10px">🎵 <b>Música (Spotify)</b> — dos formas:<br>
-  • Pega aquí el enlace de tu <b>playlist</b> (Spotify → ⋯ → Compartir → Copiar enlace). Las canciones de arriba deben ir en el mismo orden que la playlist.<br>
-  • O agrega al final de cada línea el enlace de la <b>canción</b>; así la app puede reordenarlas sola.</div>
-  <input id="pl" placeholder="https://open.spotify.com/playlist/..." style="width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px">
-  <div class="row" style="margin-top:8px">
-    <button class="pri" id="btnLoad">Cargar canciones</button>
-    <button id="btnClear">Borrar</button>
-    <button id="btnDemo">⭐ Cargar clase de ejemplo (principiante)</button>
+  <h2><span class="n">1</span>Busca tus canciones</h2>
+  <div class="hint">Escribe o dicta lo que te acuerdes (ej: <i>dont stop queen</i>) y toca <b>＋</b> en la correcta. 🎤 Usa el micrófono del teclado.</div>
+  <div style="position:relative">
+    <input id="q" type="search" autocomplete="off" placeholder="🔎 Nombre de la canción o artista" style="width:100%;background:var(--card2);color:var(--txt);border:2px solid var(--acc);border-radius:12px;padding:14px;font-size:18px">
   </div>
+  <div id="results" style="margin-top:8px"></div>
+  <audio id="prev" preload="none"></audio>
+  <div class="row" style="margin-top:10px">
+    <button id="btnDemo">⭐ Clase de ejemplo (principiante)</button>
+    <button id="btnClear">🗑️ Vaciar lista</button>
+  </div>
+  <details style="margin-top:12px">
+    <summary class="hint" style="cursor:pointer">Más opciones: pegar una lista escrita o enlace de playlist de Spotify</summary>
+    <div class="hint">Una por línea: <b>Artista - Canción BPM duración</b> (BPM y duración opcionales).</div>
+    <textarea id="txt" placeholder="Artista - Canción 128 4:05"></textarea>
+    <input id="pl" placeholder="Enlace de playlist de Spotify (opcional, para el reproductor)" style="width:100%;margin-top:6px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px">
+    <div class="row" style="margin-top:8px"><button class="pri" id="btnLoad">Agregar a la lista</button></div>
+  </details>
 </section>
 
 <section>
-  <h2><span class="n">2</span>Revisa el BPM</h2>
-  <div class="hint">Si una canción no tiene BPM, ponlo con <b>+</b>/<b>−</b> o usa el <b>Tap</b>: reproduce la canción y toca el botón al ritmo del bombo 8 veces o más.</div>
+  <h2><span class="n">2</span>Tu lista y su BPM</h2>
+  <div class="hint">La app calcula el BPM escuchando un adelanto de cada canción (marcado ≈). Si no te convence, ajústalo con <b>+</b>/<b>−</b> o con <b>Tap</b>: toca ▶, y luego toca el botón al ritmo del bombo.</div>
   <div id="songs"><div class="hint">Aún no hay canciones.</div></div>
   <div id="tapBox" class="hidden" style="margin-top:10px">
     <div class="hint">Tap para: <b id="tapName"></b></div>
@@ -225,7 +229,7 @@ function fitCost(b,k){
   if(c>=t[0]&&c<=t[1]) return 0;
   return Math.min(Math.abs(c-t[0]),Math.abs(c-t[1]))*2;
 }
-function save(){try{localStorage.setItem("spin_txt",$("txt").value);localStorage.setItem("spin_goal",goal);localStorage.setItem("spin_level",level);localStorage.setItem("spin_pl",$("pl").value)}catch(e){}}
+function save(){try{localStorage.setItem("spin_songs",JSON.stringify(songs.map(({bpmState,...x})=>x)));localStorage.setItem("spin_goal",goal);localStorage.setItem("spin_level",level);localStorage.setItem("spin_pl",$("pl").value)}catch(e){}}
 
 // ---------- Parseo ----------
 function parse(text){
@@ -246,22 +250,28 @@ function renderSongs(){
   const box=$("songs");
   if(!songs.length){box.innerHTML='<div class="hint">Aún no hay canciones.</div>';return;}
   box.innerHTML=songs.map((s,i)=>`
-   <div class="song">
+   <div class="song" style="grid-template-columns:28px 1fr">
      <div class="idx">${i+1}</div>
-     <div><div class="name">${esc(s.name)}</div>
-       <div class="meta">${fmt(s.dur)} · ${s.bpm?("cadencia posible "+cadFromBpm(s.bpm)+" rpm"):'<span class="miss">falta BPM</span>'}</div></div>
-     <div class="bpmctl">
-       <button data-a="m" data-i="${i}">−</button><span class="v ${s.bpm?"":"miss"}">${s.bpm||"?"}</span><button data-a="p" data-i="${i}">+</button>
+     <div style="display:flex;gap:10px;align-items:center">${s.art?`<img src="${s.art}" alt="" width="48" height="48" style="border-radius:6px;flex:none">`:""}
+       <div><div class="name">${esc(s.name)}</div>
+       <div class="meta">${fmt(s.dur)} · ${s.bpmState==="calc"?'<span class="miss">calculando BPM…</span>':s.bpm?("cadencia "+cadFromBpm(s.bpm)+" rpm"):'<span class="miss">falta BPM: usa Tap</span>'}</div></div></div>
+     <div></div>
+     <div class="bpmctl" style="flex-wrap:wrap">
+       ${s.preview?`<button data-a="pl" data-i="${i}" title="Escuchar">▶</button>`:""}
+       <button data-a="m" data-i="${i}">−</button><span class="v ${s.bpm?"":"miss"}">${s.bpm?(s.bpmAuto?"≈":"")+s.bpm:"?"}</span><button data-a="p" data-i="${i}">+</button>
        <button data-a="t" data-i="${i}" title="Tap tempo">Tap</button>
        <button data-a="u" data-i="${i}" title="Subir">↑</button>
+       <button data-a="x" data-i="${i}" title="Quitar">✕</button>
      </div>
    </div>`).join("");
 }
 function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 $("songs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b) return; const i=+b.dataset.i, a=b.dataset.a;
-  if(a==="m") songs[i].bpm=Math.max(50,(songs[i].bpm||120)-1);
-  if(a==="p") songs[i].bpm=Math.min(220,(songs[i].bpm||120)+1);
+  if(a==="m"){songs[i].bpm=Math.max(50,(songs[i].bpm||120)-1);songs[i].bpmAuto=false;}
+  if(a==="p"){songs[i].bpm=Math.min(220,(songs[i].bpm||120)+1);songs[i].bpmAuto=false;}
+  if(a==="x"){songs.splice(i,1);}
+  if(a==="pl"){playPreview(songs[i].preview,b);return;}
   if(a==="u"&&i>0){[songs[i-1],songs[i]]=[songs[i],songs[i-1]];}
   if(a==="t"){openTap(i);return;}
   renderSongs();
@@ -275,7 +285,7 @@ $("tapBtn").addEventListener("pointerdown",()=>{
   taps.push(t); if(taps.length>16) taps.shift();
   if(taps.length>=4){const iv=(taps[taps.length-1]-taps[0])/(taps.length-1);$("tapVal").textContent=Math.round(60000/iv);}
 });
-$("tapOk").onclick=()=>{const v=+$("tapVal").textContent;if(v&&tapIdx>=0){songs[tapIdx].bpm=v;}$("tapBox").classList.add("hidden");renderSongs();};
+$("tapOk").onclick=()=>{const v=+$("tapVal").textContent;if(v&&tapIdx>=0){songs[tapIdx].bpm=v;songs[tapIdx].bpmAuto=false;songs[tapIdx].bpmState="";save();}$("tapBox").classList.add("hidden");renderSongs();};
 $("tapCancel").onclick=()=>$("tapBox").classList.add("hidden");
 
 // ---------- Objetivos ----------
@@ -475,6 +485,67 @@ function onUpdate(pos,dur,paused){
 }
 function syncedElapsed(){const p=sync.pos+(sync.paused?0:performance.now()-sync.ts);return blockStart(cur)+Math.min(p,(plan[cur].dur*1000)-1)/1000;}
 
+// ---------- Buscador (catálogo de Apple, gratis y sin cuentas) ----------
+let qTimer=null,qSeq=0;
+function itunes(term){return new Promise((res,rej)=>{const cb="it"+Date.now()+Math.floor(Math.random()*1e5);const sc=document.createElement("script");
+  const done=()=>{try{delete window[cb]}catch(e){window[cb]=undefined}sc.remove();};
+  window[cb]=d=>{done();res(d)};sc.onerror=()=>{done();rej("net")};
+  sc.src="https://itunes.apple.com/search?media=music&entity=song&limit=10&country=CL&term="+encodeURIComponent(term)+"&callback="+cb;
+  document.body.appendChild(sc);setTimeout(()=>rej("timeout"),9000);});}
+$("q").addEventListener("input",()=>{clearTimeout(qTimer);const t=$("q").value.trim();if(t.length<2){$("results").innerHTML="";return;}qTimer=setTimeout(()=>search(t),450);});
+$("q").addEventListener("keydown",e=>{if(e.key==="Enter"){clearTimeout(qTimer);const t=$("q").value.trim();if(t.length>=2)search(t);}});
+let lastResults=[];
+async function search(t){const my=++qSeq;$("results").innerHTML='<div class="hint">Buscando…</div>';
+  try{const d=await itunes(t);if(my!==qSeq)return;lastResults=(d.results||[]).filter(x=>x.kind==="song");
+    if(!lastResults.length){$("results").innerHTML='<div class="hint">No encontré nada. Prueba con otras palabras o agrega el artista.</div>';return;}
+    $("results").innerHTML=lastResults.map((x,i)=>`<div class="song" style="grid-template-columns:52px 1fr auto">
+      <img src="${x.artworkUrl100||""}" alt="" width="48" height="48" style="border-radius:6px">
+      <div><div class="name">${esc(x.trackName||"")}</div><div class="meta">${esc(x.artistName||"")} · ${fmt((x.trackTimeMillis||0)/1000)}</div></div>
+      <div class="bpmctl">${x.previewUrl?`<button data-r="pv" data-i="${i}">▶</button>`:""}<button class="pri" data-r="add" data-i="${i}" style="font-size:22px">＋</button></div></div>`).join("");
+  }catch(e){if(my===qSeq)$("results").innerHTML='<div class="warn">No pude conectarme al buscador. Revisa tu internet e intenta de nuevo.</div>';}}
+$("results").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;const x=lastResults[+b.dataset.i];if(!x)return;
+  if(b.dataset.r==="pv"){playPreview(x.previewUrl,b);return;}
+  if(b.dataset.r==="add"){
+    if(songs.some(s=>s.id===x.trackId)){b.textContent="✓";return;}
+    const s={id:x.trackId,name:`${x.artistName} - ${x.trackName}`,dur:Math.round((x.trackTimeMillis||240000)/1000),bpm:null,art:x.artworkUrl100,preview:x.previewUrl,bpmAuto:false,bpmState:x.previewUrl?"calc":""};
+    songs.push(s);plan=[];renderSongs();save();b.textContent="✓";b.disabled=true;
+    $("notes").innerHTML='<div class="ok">'+songs.length+' canciones en tu lista.</div>';
+    if(x.previewUrl)autoBpm(s);
+  }});
+let prevBtn=null;
+function playPreview(url,btn){const a=$("prev");
+  if(prevBtn===btn&&!a.paused){a.pause();btn.textContent="▶";return;}
+  if(prevBtn)prevBtn.textContent="▶";a.src=url;a.play().then(()=>{btn.textContent="⏸";prevBtn=btn;}).catch(()=>{});
+  a.onended=()=>{btn.textContent="▶"};}
+
+// ---------- BPM automático (analiza el adelanto de 30 s) ----------
+async function detectBpm(url){
+  const buf=await (await fetch(url)).arrayBuffer();
+  const AC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  const audio=await new AC(1,44100,44100).decodeAudioData(buf);
+  const sr=audio.sampleRate;
+  async function band(type,freq){const off=new AC(1,audio.length,sr);const src=off.createBufferSource();src.buffer=audio;
+    const f=off.createBiquadFilter();f.type=type;f.frequency.value=freq;src.connect(f).connect(off.destination);src.start();return (await off.startRendering()).getChannelData(0);}
+  const low=await band("lowpass",160), full=audio.getChannelData(0);
+  const fps=200,hop=Math.floor(sr/fps),n=Math.floor(low.length/hop);
+  const env=(d)=>{const e=new Float32Array(n);for(let i=0;i<n;i++){let s=0;for(let j=i*hop;j<(i+1)*hop;j++)s+=d[j]*d[j];e[i]=Math.sqrt(s/hop);}return e;};
+  const onset=(e)=>{const o=new Float32Array(n);let m=0;for(let i=1;i<n;i++){o[i]=Math.max(0,e[i]-e[i-1]);m=Math.max(m,o[i]);}if(m)for(let i=0;i<n;i++)o[i]/=m;return o;};
+  const a1=onset(env(low)),a2=onset(env(full));const o=new Float32Array(n);for(let i=0;i<n;i++)o[i]=a1[i]+0.6*a2[i];
+  const minL=Math.floor(60*fps/200),maxL=Math.ceil(60*fps/60);const ac=new Float32Array(maxL+2);
+  for(let L=minL;L<=maxL+1;L++){let s=0;for(let i=0;i+L<n;i++)s+=o[i]*o[i+L];ac[L]=s/(n-L);}
+  let best=0,bl=minL;
+  for(let L=minL+1;L<=maxL;L++){const bpm=60*fps/L;const w=Math.exp(-0.5*Math.pow(Math.log2(bpm/120)/0.9,2));
+    const sc=ac[L]*w;if(sc>best&&ac[L]>=ac[L-1]&&ac[L]>=ac[L+1]){best=sc;bl=L;}}
+  const y0=ac[bl-1],y1=ac[bl],y2=ac[bl+1],den=y0-2*y1+y2;const off=den?0.5*(y0-y2)/den:0;
+  const bpm=60*fps/(bl+off);
+  if(!isFinite(bpm)||bpm<55||bpm>210)throw "nobpm";
+  return Math.round(bpm);
+}
+async function autoBpm(s){
+  try{const v=await detectBpm(s.preview);if(s.bpm==null||s.bpmAuto){s.bpm=v;s.bpmAuto=true;}}catch(e){}
+  s.bpmState="";renderSongs();save();
+}
+
 // ---------- Mis clases ----------
 function getSaved(){try{return JSON.parse(localStorage.getItem("spin_classes")||"[]")}catch(e){return []}}
 function setSaved(a){try{localStorage.setItem("spin_classes",JSON.stringify(a))}catch(e){$("saved").innerHTML='<div class="warn">Este navegador no deja guardar.</div>'}}
@@ -485,10 +556,11 @@ function renderSaved(){const a=getSaved();
 $("btnSave").onclick=()=>{
   if(!plan.length){$("saved").insertAdjacentHTML("afterbegin",'<div class="warn">Primero arma la clase (paso 4).</div>');return;}
   const a=getSaved();const name=($("clsName").value||"").trim()||`Clase ${a.length+1} – ${LEVELS[level].name}`;
-  a.unshift({name,level,goal,txt:plan.map(p=>`${p.name} ${p.bpm||""} ${fmt(p.dur)}${p.uri?" https://open.spotify.com/track/"+p.uri.split(":")[2]:""}`).join("\n"),pl:$("pl").value,n:plan.length});
+  a.unshift({name,level,goal,songs:plan.map(({b,blk,cad,fit,bpmState,...x})=>x),txt:plan.map(p=>`${p.name} ${p.bpm||""} ${fmt(p.dur)}${p.uri?" https://open.spotify.com/track/"+p.uri.split(":")[2]:""}`).join("\n"),pl:$("pl").value,n:plan.length});
   setSaved(a);$("clsName").value="";renderSaved();};
 $("saved").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;const a=getSaved();
-  if(b.dataset.o!==undefined){const c=a[+b.dataset.o];$("txt").value=c.txt;$("pl").value=c.pl||"";level=c.level;goal=c.goal;renderLevels();renderGoals();$("btnLoad").click();build(false);$("chart").scrollIntoView({behavior:"smooth",block:"center"});}
+  if(b.dataset.o!==undefined){const c=a[+b.dataset.o];$("pl").value=c.pl||"";level=c.level;goal=c.goal;renderLevels();renderGoals();
+    if(c.songs){songs=c.songs.map(x=>({...x}));plan=[];renderSongs();save();}else{songs=[];$("txt").value=c.txt;$("btnLoad").click();}build(false);$("chart").scrollIntoView({behavior:"smooth",block:"center"});}
   if(b.dataset.r!==undefined){const i=+b.dataset.r;const box=document.createElement("div");box.className="row";box.style.marginTop="6px";
     box.innerHTML=`<input value="${esc(a[i].name)}" style="flex:1;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px"><button class="pri">OK</button>`;
     b.closest(".song").after(box);box.querySelector("button").onclick=()=>{a[i].name=box.querySelector("input").value.trim()||a[i].name;setSaved(a);renderSaved();};}
@@ -496,8 +568,8 @@ $("saved").addEventListener("click",e=>{const b=e.target.closest("button");if(!b
 });
 
 // ---------- Botones principales ----------
-$("btnLoad").onclick=()=>{songs=parse($("txt").value);if(plUri())loadIntoPlayer(plUri());plan=[];sel=-1;elapsed=0;renderSongs();save();$("notes").innerHTML=songs.length?'<div class="ok">'+songs.length+' canciones cargadas. Revisa los BPM y toca "Ordenar canciones".</div>':"";drawChart();};
-$("btnClear").onclick=()=>{$("txt").value="";songs=[];plan=[];renderSongs();renderPlan();drawChart();$("notes").innerHTML="";save();};
+$("btnLoad").onclick=()=>{songs=songs.concat(parse($("txt").value));$("txt").value="";if(plUri())loadIntoPlayer(plUri());plan=[];sel=-1;elapsed=0;renderSongs();save();$("notes").innerHTML=songs.length?'<div class="ok">'+songs.length+' canciones cargadas. Revisa los BPM y toca "Ordenar canciones".</div>':"";drawChart();};
+$("btnClear").onclick=()=>{$("txt").value="";$("results").innerHTML="";$("q").value="";songs=[];plan=[];renderSongs();renderPlan();drawChart();$("notes").innerHTML="";save();};
 $("btnBuild").onclick=()=>build(true);
 const DEMO=`Luis Fonsi - Despacito 89 3:48
 Pharrell Williams - Happy 160 3:53
@@ -507,7 +579,7 @@ Enrique Iglesias - Bailando 91 4:03
 Ed Sheeran - Shape of You 96 3:54
 The Killers - Mr. Brightside 148 3:43
 Passenger - Let Her Go 75 4:13`;
-$("btnDemo").onclick=()=>{$("txt").value=DEMO;$("pl").value="https://open.spotify.com/playlist/0WadRS5PApQRcOFB9xeGK8";level="principiante";goal="grasa";renderLevels();renderGoals();$("btnLoad").click();build(false);$("chart").scrollIntoView({behavior:"smooth",block:"center"});};
+$("btnDemo").onclick=()=>{songs=[];$("txt").value=DEMO;$("pl").value="https://open.spotify.com/playlist/0WadRS5PApQRcOFB9xeGK8";level="principiante";goal="grasa";renderLevels();renderGoals();$("btnLoad").click();build(false);$("chart").scrollIntoView({behavior:"smooth",block:"center"});};
 $("btnKeep").onclick=()=>build(false);
 $("btnCopy").onclick=async()=>{
   if(!plan.length)return;const t=`Clase de spinning — ${LEVELS[level].name} · ${GOALS[goal].name}\n`+plan.map((p,i)=>`${i+1}. ${p.name} (${p.bpm||"?"} BPM, ${fmt(p.dur)}) — ${p.b.name}: ${p.cad} rpm, zona ${p.b.zoneTxt}, ${p.b.res}, ${p.b.pos}`).join("\n");
@@ -515,7 +587,7 @@ $("btnCopy").onclick=async()=>{
 };
 
 // ---------- Inicio ----------
-try{const t=localStorage.getItem("spin_txt");if(t){$("txt").value=t;songs=parse(t);}const g=localStorage.getItem("spin_goal");if(g&&GOALS[g])goal=g;const pv=localStorage.getItem("spin_pl");if(pv)$("pl").value=pv;const lv=localStorage.getItem("spin_level");if(lv&&LEVELS[lv])level=lv;}catch(e){}
+try{const t=localStorage.getItem("spin_songs");if(t){songs=JSON.parse(t)||[];}const g=localStorage.getItem("spin_goal");if(g&&GOALS[g])goal=g;const pv=localStorage.getItem("spin_pl");if(pv)$("pl").value=pv;const lv=localStorage.getItem("spin_level");if(lv&&LEVELS[lv])level=lv;}catch(e){}
 renderLevels();renderGoals();renderSongs();drawChart();pickMode();renderSaved();
 </script>
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
