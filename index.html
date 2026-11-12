@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arma tu clase de Spinning</title>
+<meta name="theme-color" content="#121212">
+<style>
+:root{
+  --bg:#121212;--card:#1e1e1e;--card2:#262626;--txt:#f2f2f2;--mut:#a8a8a8;--acc:#ff7a1a;--line:#333;
+  --z1:#3b82c4;--z2:#3fa34d;--z3:#d9c21c;--z4:#f08a1c;--z5:#e0392b;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:17px;line-height:1.4}
+header{padding:18px 16px 6px}
+h1{margin:0;font-size:24px}
+h1 span{color:var(--acc)}
+.sub{color:var(--mut);font-size:14px;margin-top:4px}
+main{max-width:900px;margin:0 auto;padding:8px 12px 80px}
+section{background:var(--card);border-radius:14px;padding:14px;margin:12px 0}
+h2{font-size:18px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+h2 .n{background:var(--acc);color:#000;border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:15px}
+textarea{width:100%;min-height:140px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:17px;font-family:inherit}
+.hint{color:var(--mut);font-size:14px;margin:6px 0}
+button{font:inherit;cursor:pointer;border:none;border-radius:12px;padding:12px 16px;min-height:48px;background:var(--card2);color:var(--txt)}
+button.pri{background:var(--acc);color:#000;font-weight:700}
+button.sel{outline:3px solid var(--acc);background:#3a2615}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.goals{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.goals button{text-align:left;padding:12px}
+.goals small{display:block;color:var(--mut);font-size:13px;font-weight:400}
+.song{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;padding:10px;border-bottom:1px solid var(--line)}
+.song:last-child{border-bottom:none}
+.song .idx{color:var(--mut);font-weight:700}
+.song .name{font-weight:600;word-break:break-word}
+.song .meta{color:var(--mut);font-size:14px}
+.bpmctl{display:flex;align-items:center;gap:4px}
+.bpmctl button{min-height:40px;padding:6px 12px;font-size:18px}
+.bpmctl .v{min-width:52px;text-align:center;font-weight:700}
+.miss{color:#ffb347}
+.warn{background:#3a2a10;border-left:4px solid #ffb347;padding:10px;border-radius:8px;margin:6px 0;font-size:15px}
+.ok{background:#14301a;border-left:4px solid var(--z2);padding:10px;border-radius:8px;margin:6px 0;font-size:15px}
+.safety{background:#2b1414;border-left:4px solid var(--z5);padding:10px;border-radius:8px;font-size:14px}
+#chart{width:100%;height:190px;display:block;background:#181818;border-radius:10px;touch-action:manipulation}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:13px;color:var(--mut);margin-top:8px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.panel{background:#0e0e0e;border-radius:10px;padding:10px}
+.panel .l{font-size:13px;color:var(--mut)}
+.panel .v{font-size:24px;font-weight:700}
+.panel.wide{grid-column:span 2}
+.pulse{width:22px;height:22px;border-radius:50%;background:var(--acc);display:inline-block;vertical-align:middle;margin-left:8px;opacity:.25;transition:opacity .08s}
+.pulse.on{opacity:1}
+.plan{width:100%;border-collapse:collapse;font-size:14px}
+.plan td,.plan th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.plan th{color:var(--mut);font-weight:600}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:700;color:#000}
+.tap{font-size:20px;padding:20px;width:100%}
+.hidden{display:none}
+.big{font-size:30px;font-weight:800}
+@media(min-width:640px){.panels{grid-template-columns:repeat(4,1fr)}.panel.wide{grid-column:span 2}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Arma tu clase de <span>Spinning</span></h1>
+  <div class="sub">Pega tus canciones, elige el objetivo y la app las ordena como un profe. Gratis y sin registro.</div>
+</header>
+<main>
+
+<div class="safety">⚠️ Siempre con calentamiento y vuelta a la calma. Si tienes problemas cardíacos, de presión o alguna lesión, consulta a un médico antes de entrenar.</div>
+
+<section>
+  <h2><span class="n">1</span>Tus canciones</h2>
+  <div class="hint">Una por línea: <b>Artista - Canción  BPM  duración</b>. El BPM y la duración son opcionales.<br>
+  Ej: <i>Queen - Don't Stop Me Now 156 3:29</i><br>
+  🎤 Para dictar: toca el cuadro y usa el micrófono del teclado del celular.</div>
+  <textarea id="txt" placeholder="Artista - Canción 128 4:05"></textarea>
+  <div class="hint" style="margin-top:10px">🎵 <b>Música (Spotify)</b> — dos formas:<br>
+  • Pega aquí el enlace de tu <b>playlist</b> (Spotify → ⋯ → Compartir → Copiar enlace). Las canciones de arriba deben ir en el mismo orden que la playlist.<br>
+  • O agrega al final de cada línea el enlace de la <b>canción</b>; así la app puede reordenarlas sola.</div>
+  <input id="pl" placeholder="https://open.spotify.com/playlist/..." style="width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px">
+  <div class="row" style="margin-top:8px">
+    <button class="pri" id="btnLoad">Cargar canciones</button>
+    <button id="btnClear">Borrar</button>
+    <button id="btnDemo">⭐ Cargar clase de ejemplo (principiante)</button>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">2</span>Revisa el BPM</h2>
+  <div class="hint">Si una canción no tiene BPM, ponlo con <b>+</b>/<b>−</b> o usa el <b>Tap</b>: reproduce la canción y toca el botón al ritmo del bombo 8 veces o más.</div>
+  <div id="songs"><div class="hint">Aún no hay canciones.</div></div>
+  <div id="tapBox" class="hidden" style="margin-top:10px">
+    <div class="hint">Tap para: <b id="tapName"></b></div>
+    <button class="pri tap" id="tapBtn">TOCA AL RITMO</button>
+    <div class="row" style="margin-top:8px;align-items:center">
+      <span class="big" id="tapVal">—</span><span class="hint">BPM</span>
+      <button id="tapOk">Usar este BPM</button><button id="tapCancel">Cancelar</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">3</span>Nivel y objetivo</h2>
+  <div class="hint">Nivel</div>
+  <div class="goals" id="levels" style="margin-bottom:12px"></div>
+  <div class="hint">Objetivo</div>
+  <div class="goals" id="goals"></div>
+  <div id="levelTips"></div>
+</section>
+
+<section>
+  <h2><span class="n">4</span>Tu clase</h2>
+  <div class="row"><button class="pri" id="btnBuild">Ordenar canciones</button><button id="btnKeep">Usar mi orden</button></div>
+  <div id="notes" style="margin-top:8px"></div>
+  <canvas id="chart"></canvas>
+  <div class="legend">
+    <span><i style="background:var(--z1)"></i>Z1 Recuperación</span>
+    <span><i style="background:var(--z2)"></i>Z2 Base</span>
+    <span><i style="background:var(--z3)"></i>Z3 Tempo</span>
+    <span><i style="background:var(--z4)"></i>Z4 Umbral</span>
+    <span><i style="background:var(--z5)"></i>Z5 Máximo</span>
+  </div>
+  <div class="hint">Toca una barra para ver el detalle. La altura es la intensidad y el ancho, la duración.</div>
+
+  <div class="panels">
+    <div class="panel"><div class="l">Zona de potencia</div><div class="v" id="pZone">—</div></div>
+    <div class="panel"><div class="l">Cadencia (rpm)<span class="pulse" id="pulse"></span></div><div class="v" id="pCad">—</div></div>
+    <div class="panel"><div class="l">Esfuerzo</div><div class="v" id="pEff">—</div></div>
+    <div class="panel"><div class="l">Próximo descanso</div><div class="v" id="pRest">—</div></div>
+    <div class="panel wide"><div class="l">Método de trabajo</div><div class="v" id="pPos">—</div></div>
+    <div class="panel wide"><div class="l">Bloque · tiempo total</div><div class="v" id="pTime" style="font-size:18px">—</div></div>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <button class="pri" id="btnPlay">▶ Iniciar clase</button>
+    <button id="btnPause">⏸ Pausa</button>
+    <button id="btnPrev">⏮</button><button id="btnNext">⏭</button>
+    <button id="btnClick">🔈 Metrónomo: no</button>
+    <button id="btnVoice">🗣️ Voz del profe: sí</button>
+  </div>
+  <div id="modeMsg" class="hint"></div>
+  <div id="tapPlay" class="warn hidden">👆 Si no parte la música, toca ▶ en el reproductor de Spotify (el celular a veces lo exige).</div>
+  <div id="embedWrap" style="margin-top:8px"><div id="embed"></div></div>
+  <div class="hint">Sube el volumen y saca el modo silencio. Para escuchar canciones completas, inicia sesión con tu cuenta Premium en open.spotify.com en este mismo navegador; si no, Spotify solo pone 30 segundos.</div>
+
+  <div style="overflow-x:auto;margin-top:12px"><table class="plan" id="plan"></table></div>
+  <div class="row" style="margin-top:10px"><button id="btnCopy">📋 Copiar plan</button></div>
+  <div class="hint" id="copyMsg"></div>
+</section>
+
+<section>
+  <h2>💾 Mis clases</h2>
+  <div class="hint">Guarda la clase con su playlist para repetirla después con un toque.</div>
+  <input id="clsName" placeholder="Nombre de la clase (puedes dictarlo)" style="width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px">
+  <div class="row" style="margin-top:8px"><button class="pri" id="btnSave">Guardar clase</button></div>
+  <div id="saved" style="margin-top:10px"></div>
+</section>
+
+<section>
+  <h2>📚 Cómo leer los indicadores</h2>
+  <div class="hint" style="font-size:15px;color:var(--txt)">
+  <b>Zona de potencia:</b> % de tu FTP (la potencia que aguantas ~1 hora). Sin potenciómetro, guíate por el esfuerzo.<br>
+  <b>Zona de FC:</b> % de tu frecuencia cardíaca máxima (estimación simple: 220 − edad).<br>
+  <b>Cadencia:</b> pedaladas por minuto. Llano 80–100, subida 60–75, sprint 100–115.<br>
+  <b>Resistencia:</b> la perilla. A menos cadencia, más resistencia. Nunca pedalees muy rápido sin carga (rebotas y te puedes lesionar).<br>
+  <b>BPM → cadencia:</b> una pedalada por beat (90 BPM = 90 rpm) o una cada dos beats (128 BPM = 64 rpm, subida).<br>
+  <b>Esfuerzo (1–10):</b> Muy ligero 1–2 · Ligero 3–4 · Moderado 5–6 · Intenso 7–8 · Máximo 9–10.
+  </div>
+</section>
+</main>
+
+<script>
+// ---------- Datos de bloques ----------
+const BLOCKS = {
+  calentamiento:{name:"Calentamiento",zone:1.5,zoneTxt:"50-65%",cad:[85,95],eff:"Muy ligero → Ligero",pos:"Sentado",res:"Baja, subiendo de a poco",rest:false},
+  llano:{name:"Llano",zone:2,zoneTxt:"56-75%",cad:[85,100],eff:"Moderado",pos:"Sentado",res:"Media-baja",rest:false},
+  tempo:{name:"Tempo",zone:3,zoneTxt:"76-90%",cad:[80,92],eff:"Moderado-Intenso",pos:"Sentado",res:"Media",rest:false},
+  subida:{name:"Subida",zone:3.6,zoneTxt:"80-95%",cad:[60,75],eff:"Intenso",pos:"Sentado / De pie",res:"Alta",rest:false},
+  fuerza:{name:"Fuerza glúteo",zone:3.8,zoneTxt:"85-95%",cad:[55,65],eff:"Intenso",pos:"De pie, cadera atrás",res:"Muy alta",rest:false},
+  umbral:{name:"Umbral",zone:4,zoneTxt:"91-105%",cad:[85,95],eff:"Intenso",pos:"Sentado",res:"Media-alta",rest:false},
+  sprint:{name:"Sprint / HIIT",zone:5,zoneTxt:">105%",cad:[100,115],eff:"Máximo",pos:"Sentado / De pie",res:"Media (con carga)",rest:false},
+  recuperacion:{name:"Recuperación",zone:1,zoneTxt:"<55%",cad:[80,90],eff:"Muy ligero",pos:"Sentado",res:"Baja",rest:true},
+  calma:{name:"Vuelta a la calma",zone:1,zoneTxt:"<55%",cad:[70,85],eff:"Muy ligero",pos:"Sentado + estirar",res:"Muy baja",rest:true}
+};
+const GOALS = {
+  grasa:{name:"Quemar grasa",d:"Mucho tiempo en Z2–Z3 con picos",pat:["llano","tempo","subida","llano","tempo","recuperacion"]},
+  resistencia:{name:"Resistencia",d:"Bloques largos sostenidos",pat:["llano","tempo","umbral","llano","tempo","subida","recuperacion"]},
+  gluteo:{name:"Glúteo / fuerza",d:"Subidas pesadas, cadencia baja",pat:["subida","fuerza","recuperacion","fuerza","subida","recuperacion"]},
+  hiit:{name:"HIIT / intervalos",d:"Picos máximos y descansos",pat:["sprint","recuperacion","subida","sprint","recuperacion","umbral"]},
+  suave:{name:"Recuperación activa",d:"Suave, para días de descanso",pat:["llano","recuperacion","llano","recuperacion"]}
+};
+const ZCOL = z => z>=4.5?"#e0392b":z>=3.5?"#f08a1c":z>=2.5?"#d9c21c":z>=1.5?"#3fa34d":"#3b82c4";
+
+const LEVELS={
+  principiante:{name:"Principiante",d:"Primeras clases, sin sprints, más descansos"},
+  intermedio:{name:"Intermedio",d:"Ya aguantas 45 min seguidos"},
+  avanzado:{name:"Avanzado",d:"Menos descanso, más tiempo en zona alta"}
+};
+const BEGIN_OVR={
+  subida:{zone:3,zoneTxt:"70-80%",cad:[65,78],eff:"Moderado",pos:"Sentado",res:"Media (puedes hablar entrecortado)"},
+  tempo:{zone:2.6,zoneTxt:"70-80%",cad:[80,92],eff:"Moderado"},
+  llano:{zone:2,zoneTxt:"56-70%",cad:[80,95],eff:"Ligero-Moderado"},
+  calentamiento:{cad:[80,95]},
+  calma:{cad:[70,85]}
+};
+function blk(k){return level==="principiante"&&BEGIN_OVR[k]?{...BLOCKS[k],...BEGIN_OVR[k]}:BLOCKS[k];}
+let level="intermedio";
+let songs=[]; let goal="grasa"; let plan=[]; let sel=-1;
+
+// ---------- Utilidades ----------
+const $=id=>document.getElementById(id);
+const fmt=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
+function cadFromBpm(b,target){
+  if(!b) return null;
+  const c=[b,b/2,b*2].filter(x=>x>=50&&x<=120);
+  if(!c.length) return null;
+  if(!target) return Math.round(c[0]);
+  const mid=(target[0]+target[1])/2;
+  return Math.round(c.sort((a,b)=>Math.abs(a-mid)-Math.abs(b-mid))[0]);
+}
+function fitCost(b,k){
+  const t=blk(k).cad; if(!b) return 25;
+  const c=cadFromBpm(b,t); if(c==null) return 60;
+  if(c>=t[0]&&c<=t[1]) return 0;
+  return Math.min(Math.abs(c-t[0]),Math.abs(c-t[1]))*2;
+}
+function save(){try{localStorage.setItem("spin_txt",$("txt").value);localStorage.setItem("spin_goal",goal);localStorage.setItem("spin_level",level);localStorage.setItem("spin_pl",$("pl").value)}catch(e){}}
+
+// ---------- Parseo ----------
+function parse(text){
+  return text.split(/\n+/).map(l=>l.trim()).filter(Boolean).map(l=>{
+    let dur=240, bpm=null, name=l, uri=null;
+    const tm=name.match(/(?:https?:\/\/)?open\.spotify\.com\/(?:intl-[a-z-]+\/)?track\/([A-Za-z0-9]{22})\S*|spotify:track:([A-Za-z0-9]{22})/);
+    if(tm){uri="spotify:track:"+(tm[1]||tm[2]);name=(name.slice(0,tm.index)+" "+name.slice(tm.index+tm[0].length)).trim();}
+    const dm=name.match(/(\d{1,2}):(\d{2})\s*$/); if(dm){dur=+dm[1]*60+ +dm[2];name=name.slice(0,dm.index).trim();}
+    const bm=name.match(/(?:^|\s)(\d{2,3})\s*(?:bpm)?\s*$/i);
+    if(bm&&+bm[1]>=50&&+bm[1]<=220){bpm=+bm[1];name=name.slice(0,bm.index).trim();}
+    name=name.replace(/[\s,;|–-]+$/,"");
+    return {name:name||"Canción de Spotify",bpm,dur,uri};
+  });
+}
+
+// ---------- Render canciones ----------
+function renderSongs(){
+  const box=$("songs");
+  if(!songs.length){box.innerHTML='<div class="hint">Aún no hay canciones.</div>';return;}
+  box.innerHTML=songs.map((s,i)=>`
+   <div class="song">
+     <div class="idx">${i+1}</div>
+     <div><div class="name">${esc(s.name)}</div>
+       <div class="meta">${fmt(s.dur)} · ${s.bpm?("cadencia posible "+cadFromBpm(s.bpm)+" rpm"):'<span class="miss">falta BPM</span>'}</div></div>
+     <div class="bpmctl">
+       <button data-a="m" data-i="${i}">−</button><span class="v ${s.bpm?"":"miss"}">${s.bpm||"?"}</span><button data-a="p" data-i="${i}">+</button>
+       <button data-a="t" data-i="${i}" title="Tap tempo">Tap</button>
+       <button data-a="u" data-i="${i}" title="Subir">↑</button>
+     </div>
+   </div>`).join("");
+}
+function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+$("songs").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return; const i=+b.dataset.i, a=b.dataset.a;
+  if(a==="m") songs[i].bpm=Math.max(50,(songs[i].bpm||120)-1);
+  if(a==="p") songs[i].bpm=Math.min(220,(songs[i].bpm||120)+1);
+  if(a==="u"&&i>0){[songs[i-1],songs[i]]=[songs[i],songs[i-1]];}
+  if(a==="t"){openTap(i);return;}
+  renderSongs();
+});
+
+// ---------- Tap tempo ----------
+let tapIdx=-1,taps=[];
+function openTap(i){tapIdx=i;taps=[];$("tapName").textContent=songs[i].name;$("tapVal").textContent="—";$("tapBox").classList.remove("hidden");$("tapBox").scrollIntoView({behavior:"smooth",block:"center"});}
+$("tapBtn").addEventListener("pointerdown",()=>{
+  const t=performance.now(); if(taps.length&&t-taps[taps.length-1]>2500) taps=[];
+  taps.push(t); if(taps.length>16) taps.shift();
+  if(taps.length>=4){const iv=(taps[taps.length-1]-taps[0])/(taps.length-1);$("tapVal").textContent=Math.round(60000/iv);}
+});
+$("tapOk").onclick=()=>{const v=+$("tapVal").textContent;if(v&&tapIdx>=0){songs[tapIdx].bpm=v;}$("tapBox").classList.add("hidden");renderSongs();};
+$("tapCancel").onclick=()=>$("tapBox").classList.add("hidden");
+
+// ---------- Objetivos ----------
+function renderGoals(){
+  $("goals").innerHTML=Object.entries(GOALS).map(([k,g])=>`<button data-g="${k}" class="${k===goal?"sel":""}"><b>${g.name}</b><small>${g.d}</small></button>`).join("");
+}
+function renderLevels(){
+  $("levels").innerHTML=Object.entries(LEVELS).map(([k,g])=>`<button data-l="${k}" class="${k===level?"sel":""}"><b>${g.name}</b><small>${g.d}</small></button>`).join("");
+  $("levelTips").innerHTML=level==="principiante"?`<div class="ok" style="margin-top:10px"><b>Tips para principiantes</b><br>
+  • Sillín a la altura de la cadera; con el pedal abajo, la rodilla queda apenas flectada.<br>
+  • Clases de 25–40 min, 2–3 veces por semana. Sube la duración de a poco.<br>
+  • Todo sentado las primeras semanas; pararse viene después.<br>
+  • Siempre con algo de resistencia: nunca pedalees "en el aire".<br>
+  • Si no puedes hablar, baja la resistencia. Agua cada 10 min.</div>`:"";
+}
+$("levels").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;level=b.dataset.l;renderLevels();save();if(plan.length)build(true);});
+$("goals").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;goal=b.dataset.g;renderGoals();save();if(plan.length)build(true);});
+
+// ---------- Armado de la clase ----------
+function slotsFor(n){
+  if(n===1) return ["llano"];
+  if(n===2) return ["calentamiento","calma"];
+  let pat=GOALS[goal].pat.slice();
+  if(level==="principiante"){
+    const map={sprint:"tempo",umbral:"tempo",fuerza:"subida"};
+    pat=pat.map(x=>map[x]||x).filter(x=>x!=="recuperacion");
+    const p2=[];let w=0;pat.forEach(x=>{p2.push(x);if(++w%2===0)p2.push("recuperacion");});
+    if(!BLOCKS[p2[p2.length-1]].rest)p2.push("recuperacion");pat=p2;
+  }
+  if(level==="avanzado"){
+    pat=pat.map(x=>x==="llano"?"tempo":x);
+    let seen=0;pat=pat.filter(x=>!(x==="recuperacion"&&(seen++%2===1)));
+  }
+  const warm=(level==="principiante"&&n>=8)?2:1;
+  const mid=n-1-warm, out=[];
+  for(let i=0;i<mid;i++) out.push(pat[i%pat.length]);
+  // no terminar el bloque central en recuperación justo antes de la calma
+  if(level!=="principiante"&&out.length>1&&BLOCKS[out[out.length-1]].rest){const j=out.findIndex(x=>!BLOCKS[x].rest);out[out.length-1]=pat.find(x=>!BLOCKS[x].rest);}
+  return [...Array(warm).fill("calentamiento"),...out,"calma"];
+}
+function assign(slots,list){
+  // greedy + mejora por intercambios (2-swap)
+  let order=list.slice();
+  const cost=o=>o.reduce((s,song,i)=>s+fitCost(song.bpm,slots[i]),0);
+  // greedy inicial
+  const pool=list.slice(); order=[];
+  slots.forEach(sl=>{let bi=0,bc=1e9;pool.forEach((s,i)=>{const c=fitCost(s.bpm,sl);if(c<bc){bc=c;bi=i}});order.push(pool.splice(bi,1)[0]);});
+  let improved=true,guard=0;
+  while(improved&&guard++<200){improved=false;
+    for(let i=0;i<order.length;i++)for(let j=i+1;j<order.length;j++){
+      const a=fitCost(order[i].bpm,slots[i])+fitCost(order[j].bpm,slots[j]);
+      const b=fitCost(order[j].bpm,slots[i])+fitCost(order[i].bpm,slots[j]);
+      if(b<a){[order[i],order[j]]=[order[j],order[i]];improved=true;}
+    }}
+  return order;
+}
+function slotsForGiven(list){
+  // usa el orden del usuario y elige para cada canción el bloque que mejor calza, respetando inicio/fin
+  const n=list.length; let gp=GOALS[goal].pat; if(level==="principiante"){const m={sprint:"tempo",umbral:"tempo",fuerza:"subida"};gp=gp.map(x=>m[x]||x);} const allowed=new Set(["calentamiento","calma",...gp]);
+  return list.map((s,i)=>{
+    if(i===0&&n>1) return "calentamiento";
+    if(i===n-1&&n>1) return "calma";
+    let best="llano",bc=1e9; allowed.forEach(k=>{if(k==="calentamiento"||k==="calma")return;const c=fitCost(s.bpm,k);if(c<bc){bc=c;best=k}});
+    return best;
+  });
+}
+function build(auto){
+  if(!songs.length){$("notes").innerHTML='<div class="warn">Primero carga tus canciones (paso 1).</div>';return;}
+  let slots, order;
+  if(auto){slots=slotsFor(songs.length);order=assign(slots,songs);}
+  else{order=songs.slice();slots=slotsForGiven(order);}
+  plan=order.map((s,i)=>{const b=blk(slots[i]);return{...s,blk:slots[i],b,cad:s.bpm?cadFromBpm(s.bpm,b.cad):Math.round((b.cad[0]+b.cad[1])/2),fit:fitCost(s.bpm,slots[i])}});
+  if(auto){songs=order.slice();renderSongs();}
+  notes(auto);renderPlan();drawChart();setPanels(0,0);pickMode();
+  if(auto&&mode==="playlist")$("notes").insertAdjacentHTML("beforeend",'<div class="warn">Ojo: en modo playlist la música suena en el orden de Spotify. Reordena la playlist en Spotify como dice la tabla, o toca "Usar mi orden".</div>');
+}
+function notes(auto){
+  const n=[]; const tot=plan.reduce((a,p)=>a+p.dur,0);
+  n.push(`<div class="ok">Clase de <b>${fmt(tot)}</b> min · ${plan.length} canciones · nivel <b>${LEVELS[level].name}</b> · objetivo <b>${GOALS[goal].name}</b>${auto?" (orden automático)":" (tu orden)"}.</div>`);
+  if(level==="principiante"&&tot>45*60) n.push('<div class="warn">Para principiantes, más de 45 min es mucho. Saca canciones y apunta a 25–40 min (6–10 temas).</div>');
+  if(level==="principiante"&&plan.some(p=>p.cad>100)) n.push('<div class="warn">Hay cadencias sobre 100 rpm: un principiante puede rebotar en el sillín. Pedalea a medio tiempo o cambia el tema.</div>');
+  if(level==="principiante"&&goal==="hiit") n.push('<div class="warn">HIIT en nivel principiante: cambié los sprints por bloques de tempo. Los sprints de verdad, después de unas 6–8 semanas.</div>');
+  if(tot<20*60&&level!=="principiante") n.push('<div class="warn">La clase dura menos de 20 min. Para un buen trabajo apunta a 40–50 min (10–13 canciones).</div>');
+  if(plan.length<4) n.push('<div class="warn">Con menos de 4 canciones no alcanza para calentar, trabajar y volver a la calma bien.</div>');
+  const miss=plan.filter(p=>!p.bpm); if(miss.length) n.push(`<div class="warn">${miss.length} canción(es) sin BPM: las ubiqué sin saber su ritmo. Confírmalo con Tap o búscalo en songbpm.com.</div>`);
+  const bad=plan.filter(p=>p.fit>=20&&p.bpm); if(bad.length) n.push(`<div class="warn">No calzan bien con su bloque: ${bad.map(p=>"<b>"+esc(p.name)+"</b> ("+p.bpm+" BPM en "+p.b.name+")").join(", ")}. Considera cambiarlas.</div>`);
+  if(level!=="principiante"&&goal==="gluteo"&&!songs.some(s=>s.bpm&&(cadFromBpm(s.bpm,[55,65])<=68))) n.push('<div class="warn">Para glúteo te faltan temas lentos y pesados (110–135 BPM, o 55–68 BPM) para pedalear de pie con carga.</div>');
+  if(level!=="principiante"&&goal==="hiit"&&!songs.some(s=>s.bpm&&cadFromBpm(s.bpm,[100,115])>=100)) n.push('<div class="warn">Para HIIT conviene tener temas rápidos (100–115 BPM, o 200+ a medio tiempo) para los sprints.</div>');
+  $("notes").innerHTML=n.join("");
+}
+function renderPlan(){
+  $("plan").innerHTML='<tr><th>#</th><th>Canción</th><th>Bloque</th><th>Cadencia</th><th>Zona</th><th>Resistencia · posición</th></tr>'+
+  plan.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.name)}<br><span class="hint">${p.bpm?p.bpm+" BPM":"BPM ?"} · ${fmt(p.dur)}</span></td>
+   <td><span class="tag" style="background:${ZCOL(p.b.zone)}">${p.b.name}</span></td><td>${p.cad} rpm</td><td>${p.b.zoneTxt}<br><span class="hint">${p.b.eff}</span></td><td>${p.b.res}<br><span class="hint">${p.b.pos}</span></td></tr>`).join("");
+}
+
+// ---------- Gráfico ----------
+const cv=$("chart"),cx=cv.getContext("2d"); let bars=[];
+function drawChart(){
+  const dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr;cx.setTransform(dpr,0,0,dpr,0,0);
+  cx.clearRect(0,0,W,H);bars=[];
+  if(!plan.length){cx.fillStyle="#777";cx.font="15px system-ui";cx.fillText("El perfil de la clase aparecerá aquí",14,H/2);return;}
+  const tot=plan.reduce((a,p)=>a+p.dur,0),pad=6,gw=W-pad*2;let x=pad;
+  for(let z=1;z<=5;z++){cx.strokeStyle="#2a2a2a";const y=H-14-(z/5)*(H-24);cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke();}
+  plan.forEach((p,i)=>{
+    const w=Math.max(4,p.dur/tot*gw-3),h=(p.b.zone/5)*(H-24);
+    cx.fillStyle=ZCOL(p.b.zone);cx.globalAlpha=(sel===-1||sel===i)?1:.45;
+    cx.fillRect(x,H-14-h,w,h);cx.globalAlpha=1;
+    cx.fillStyle="#bbb";cx.font="11px system-ui";if(w>14)cx.fillText(i+1,x+3,H-2);
+    bars.push({x,w,i});x+=w+3;
+  });
+  if(playing||elapsed>0){const px=pad+Math.min(1,elapsed/tot)*gw;cx.strokeStyle="#fff";cx.lineWidth=2;cx.beginPath();cx.moveTo(px,0);cx.lineTo(px,H-14);cx.stroke();cx.lineWidth=1;}
+}
+cv.addEventListener("click",e=>{const r=cv.getBoundingClientRect(),x=e.clientX-r.left;const b=bars.find(b=>x>=b.x&&x<=b.x+b.w+3);if(!b)return;sel=b.i;
+  const start=plan.slice(0,b.i).reduce((a,p)=>a+p.dur,0);if(!playing){elapsed=start;}setPanels(b.i,elapsed-start);drawChart();});
+window.addEventListener("resize",drawChart);
+
+// ---------- Paneles y reproducción ----------
+let playing=false,elapsed=0,last=0,clickOn=false,actx=null,beatT=0,voiceOn=true,lastSpoken=-1;
+function unlockAudio(){try{if(!actx)actx=new (window.AudioContext||window.webkitAudioContext)();if(actx.state==="suspended")actx.resume();}catch(e){}}
+function say(t){if(!voiceOn)return;try{const u=new SpeechSynthesisUtterance(t);u.lang="es-ES";u.rate=1;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
+function announce(i){const p=plan[i];if(!p)return;const nx=plan[i+1];
+  let t=`${p.b.name}. Cadencia ${p.cad}. Resistencia ${p.b.res.split("(")[0]}. ${p.b.pos}. Esfuerzo ${p.b.eff.replace("→","a")}.`;
+  if(i===0)t="Comenzamos. "+t;
+  if(!nx)t+=" Última canción, a bajar pulsaciones y estirar.";
+  say(t);}
+function locate(t){let acc=0;for(let i=0;i<plan.length;i++){if(t<acc+plan[i].dur)return{i,inBlk:t-acc,start:acc};acc+=plan[i].dur;}return{i:plan.length-1,inBlk:plan[plan.length-1].dur,start:acc-plan[plan.length-1].dur};}
+function setPanels(i,inBlk){
+  const p=plan[i]; if(!p) return;
+  $("pZone").textContent=p.b.zoneTxt;$("pCad").textContent=p.cad;$("pEff").textContent=p.b.eff;$("pPos").textContent=fmt(inBlk)+"  "+p.b.pos;
+  let rest="Ahora";if(!p.b.rest){let t=p.dur-inBlk;for(let j=i+1;j<plan.length;j++){if(plan[j].b.rest)break;t+=plan[j].dur;}rest=fmt(t);}
+  $("pRest").textContent=rest;
+  const tot=plan.reduce((a,q)=>a+q.dur,0);$("pTime").textContent=`${i+1}/${plan.length} ${p.b.name} — ${esc(p.name)} · ${fmt(elapsed)} / ${fmt(tot)}`;
+}
+function tick(now){
+  if(!playing)return;const dt=(now-last)/1000;last=now;
+  if(mode==="timer")elapsed+=dt;else elapsed=syncedElapsed();
+  const tot=plan.reduce((a,q)=>a+q.dur,0);if(elapsed>=tot){playing=false;elapsed=tot;}
+  const L=locate(elapsed);sel=L.i;setPanels(L.i,L.inBlk);drawChart();
+  if(L.i!==lastSpoken){lastSpoken=L.i;announce(L.i);}
+  if(!playing&&mode==="timer"){say("Clase terminada. ¡Bien hecho!");}
+  // pulso de cadencia
+  const per=60/plan[L.i].cad;beatT+=dt;if(beatT>=per){beatT-=per;beat();}
+  requestAnimationFrame(tick);
+}
+function beat(){const el=$("pulse");el.classList.add("on");setTimeout(()=>el.classList.remove("on"),90);
+  if(clickOn&&actx){try{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=1000;g.gain.setValueAtTime(.25,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.06);o.connect(g).connect(actx.destination);o.start();o.stop(actx.currentTime+.07);}catch(e){}}}
+$("btnPlay").onclick=()=>{unlockAudio();if(!plan.length){build(true);if(!plan.length)return;}lastSpoken=-1;
+  pickMode();
+  if(mode!=="timer"){
+    const resume=playing===false&&elapsed>0&&elapsed<blockStart(plan.length);
+    playing=true;last=performance.now();
+    if(resume){requestPlay();}
+    else{elapsed=0;cur=0;lastDur=0;lastPos=0;
+      if(mode==="track")startTrack(0);else{loadIntoPlayer(plUri());setTimeout(requestPlay,600);}}
+    requestAnimationFrame(tick);return;}const tot=plan.reduce((a,q)=>a+q.dur,0);if(elapsed>=tot)elapsed=0;playing=true;last=performance.now();requestAnimationFrame(tick);};
+$("btnPause").onclick=()=>{playing=false;try{ctrl&&mode!=="timer"&&ctrl.pause();}catch(e){}};
+function jump(d){if(!plan.length)return;
+  if(playing&&mode==="track"){const j=Math.max(0,Math.min(plan.length-1,cur+d));startTrack(j);return;}
+  if(playing&&mode==="playlist"){$("modeMsg").innerHTML="En modo playlist, salta con ⏭ / ⏮ del reproductor de Spotify.";return;}const L=locate(elapsed);const j=Math.max(0,Math.min(plan.length-1,L.i+d));elapsed=plan.slice(0,j).reduce((a,p)=>a+p.dur,0)+0.01;sel=j;setPanels(j,0);drawChart();lastSpoken=j;announce(j);}
+$("btnPrev").onclick=()=>jump(-1);$("btnNext").onclick=()=>jump(1);
+$("btnClick").onclick=()=>{clickOn=!clickOn;$("btnClick").textContent="🔈 Metrónomo: "+(clickOn?"sí":"no");if(clickOn){unlockAudio();beat();}};
+$("btnVoice").onclick=()=>{voiceOn=!voiceOn;$("btnVoice").textContent="🗣️ Voz del profe: "+(voiceOn?"sí":"no");if(voiceOn)say("Voz activada");else try{speechSynthesis.cancel()}catch(e){}};
+
+// ---------- Spotify ----------
+let ctrl=null,mode="timer",cur=0,sync={pos:0,dur:0,ts:0,paused:true},lastDur=0,lastPos=0,endedFlag=false,tapTimer=null;
+function plUri(){const m=($("pl").value||"").match(/playlist[\/:]([A-Za-z0-9]{22})/);return m?"spotify:playlist:"+m[1]:null;}
+function pickMode(){
+  if(plan.length&&plan.every(p=>p.uri)) mode="track"; else if(plUri()) mode="playlist"; else mode="timer";
+  $("modeMsg").innerHTML={track:"🎵 Modo canciones: la app pone cada tema y avanza sola.",playlist:"🎵 Modo playlist: la app sigue tu playlist de Spotify en orden. Para saltar, usa ⏭ del reproductor.",timer:"⏱️ Sin enlaces de Spotify: solo cronómetro y voz. Pega el enlace de tu playlist en el paso 1 para que la música vaya sola."}[mode];
+  return mode;
+}
+function blockStart(i){return plan.slice(0,i).reduce((a,p)=>a+p.dur,0);}
+window.onSpotifyIframeApiReady=(API)=>{
+  API.createController($("embed"),{width:"100%",height:152,uri:plUri()||"spotify:playlist:0WadRS5PApQRcOFB9xeGK8"},c=>{
+    ctrl=c;
+    c.addListener("playback_update",e=>{const d=e.data||{};onUpdate(d.position||0,d.duration||0,!!d.isPaused);});
+  });
+};
+function loadIntoPlayer(uri){try{if(ctrl&&uri)ctrl.loadUri(uri);}catch(e){}}
+function requestPlay(){try{ctrl&&ctrl.play();}catch(e){}
+  clearTimeout(tapTimer);tapTimer=setTimeout(()=>{if(sync.paused||sync.pos===0)$("tapPlay").classList.remove("hidden");},4000);}
+function startTrack(i){cur=i;endedFlag=false;lastDur=0;sync={pos:0,dur:0,ts:performance.now(),paused:true};loadIntoPlayer(plan[i].uri);setTimeout(requestPlay,600);}
+function onUpdate(pos,dur,paused){
+  if(!playing||mode==="timer")return;
+  if(pos>0&&!paused)$("tapPlay").classList.add("hidden");
+  if(mode==="playlist"){
+    const changed=(lastDur>0&&dur>0&&Math.abs(dur-lastDur)>1500)||(lastPos>8000&&pos<3000&&pos<lastPos-5000);
+    if(changed&&cur<plan.length-1){cur++;}
+    lastDur=dur||lastDur;lastPos=pos;
+  }
+  if(dur>0&&Math.abs(plan[cur].dur-dur/1000)>1){plan[cur].dur=dur/1000;renderPlan();}
+  sync={pos,dur,ts:performance.now(),paused};
+  if(mode==="playlist"&&cur===plan.length-1&&!endedFlag&&pos>3000&&dur>0&&dur-pos<900){endedFlag=true;playing=false;say("Clase terminada. ¡Bien hecho!");try{ctrl.pause()}catch(e){}}
+  if(mode==="track"&&!endedFlag&&pos>3000&&dur>0&&dur-pos<900){endedFlag=true;
+    if(cur<plan.length-1)startTrack(cur+1);else{playing=false;say("Clase terminada. ¡Bien hecho!");}}
+}
+function syncedElapsed(){const p=sync.pos+(sync.paused?0:performance.now()-sync.ts);return blockStart(cur)+Math.min(p,(plan[cur].dur*1000)-1)/1000;}
+
+// ---------- Mis clases ----------
+function getSaved(){try{return JSON.parse(localStorage.getItem("spin_classes")||"[]")}catch(e){return []}}
+function setSaved(a){try{localStorage.setItem("spin_classes",JSON.stringify(a))}catch(e){$("saved").innerHTML='<div class="warn">Este navegador no deja guardar.</div>'}}
+function renderSaved(){const a=getSaved();
+  $("saved").innerHTML=a.length?a.map((c,i)=>`<div class="song" style="grid-template-columns:1fr auto">
+    <div><div class="name">${esc(c.name)}</div><div class="meta">${LEVELS[c.level]?LEVELS[c.level].name:""} · ${GOALS[c.goal]?GOALS[c.goal].name:""} · ${c.n} canciones</div></div>
+    <div class="row"><button class="pri" data-o="${i}">▶ Abrir</button><button data-r="${i}">✏️</button><button data-d="${i}">🗑️</button></div></div>`).join(""):'<div class="hint">Todavía no guardas clases.</div>';}
+$("btnSave").onclick=()=>{
+  if(!plan.length){$("saved").insertAdjacentHTML("afterbegin",'<div class="warn">Primero arma la clase (paso 4).</div>');return;}
+  const a=getSaved();const name=($("clsName").value||"").trim()||`Clase ${a.length+1} – ${LEVELS[level].name}`;
+  a.unshift({name,level,goal,txt:plan.map(p=>`${p.name} ${p.bpm||""} ${fmt(p.dur)}${p.uri?" https://open.spotify.com/track/"+p.uri.split(":")[2]:""}`).join("\n"),pl:$("pl").value,n:plan.length});
+  setSaved(a);$("clsName").value="";renderSaved();};
+$("saved").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;const a=getSaved();
+  if(b.dataset.o!==undefined){const c=a[+b.dataset.o];$("txt").value=c.txt;$("pl").value=c.pl||"";level=c.level;goal=c.goal;renderLevels();renderGoals();$("btnLoad").click();build(false);$("chart").scrollIntoView({behavior:"smooth",block:"center"});}
+  if(b.dataset.r!==undefined){const i=+b.dataset.r;const box=document.createElement("div");box.className="row";box.style.marginTop="6px";
+    box.innerHTML=`<input value="${esc(a[i].name)}" style="flex:1;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px"><button class="pri">OK</button>`;
+    b.closest(".song").after(box);box.querySelector("button").onclick=()=>{a[i].name=box.querySelector("input").value.trim()||a[i].name;setSaved(a);renderSaved();};}
+  if(b.dataset.d!==undefined){a.splice(+b.dataset.d,1);setSaved(a);renderSaved();}
+});
+
+// ---------- Botones principales ----------
+$("btnLoad").onclick=()=>{songs=parse($("txt").value);if(plUri())loadIntoPlayer(plUri());plan=[];sel=-1;elapsed=0;renderSongs();save();$("notes").innerHTML=songs.length?'<div class="ok">'+songs.length+' canciones cargadas. Revisa los BPM y toca "Ordenar canciones".</div>':"";drawChart();};
+$("btnClear").onclick=()=>{$("txt").value="";songs=[];plan=[];renderSongs();renderPlan();drawChart();$("notes").innerHTML="";save();};
+$("btnBuild").onclick=()=>build(true);
+const DEMO=`Luis Fonsi - Despacito 89 3:48
+Pharrell Williams - Happy 160 3:53
+The Weeknd - Blinding Lights 171 3:20
+Coldplay - Viva la Vida 138 4:02
+Enrique Iglesias - Bailando 91 4:03
+Ed Sheeran - Shape of You 96 3:54
+The Killers - Mr. Brightside 148 3:43
+Passenger - Let Her Go 75 4:13`;
+$("btnDemo").onclick=()=>{$("txt").value=DEMO;$("pl").value="https://open.spotify.com/playlist/0WadRS5PApQRcOFB9xeGK8";level="principiante";goal="grasa";renderLevels();renderGoals();$("btnLoad").click();build(false);$("chart").scrollIntoView({behavior:"smooth",block:"center"});};
+$("btnKeep").onclick=()=>build(false);
+$("btnCopy").onclick=async()=>{
+  if(!plan.length)return;const t=`Clase de spinning — ${LEVELS[level].name} · ${GOALS[goal].name}\n`+plan.map((p,i)=>`${i+1}. ${p.name} (${p.bpm||"?"} BPM, ${fmt(p.dur)}) — ${p.b.name}: ${p.cad} rpm, zona ${p.b.zoneTxt}, ${p.b.res}, ${p.b.pos}`).join("\n");
+  try{await navigator.clipboard.writeText(t);$("copyMsg").textContent="Plan copiado ✔";}catch(e){$("copyMsg").textContent="No pude copiar; mantén presionada la tabla para seleccionarla.";}
+};
+
+// ---------- Inicio ----------
+try{const t=localStorage.getItem("spin_txt");if(t){$("txt").value=t;songs=parse(t);}const g=localStorage.getItem("spin_goal");if(g&&GOALS[g])goal=g;const pv=localStorage.getItem("spin_pl");if(pv)$("pl").value=pv;const lv=localStorage.getItem("spin_level");if(lv&&LEVELS[lv])level=lv;}catch(e){}
+renderLevels();renderGoals();renderSongs();drawChart();pickMode();renderSaved();
+</script>
+<script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
+</body>
+</html>
