@@ -145,6 +145,7 @@ button.sel{outline:3px solid var(--acc);background:#3a2615}
   </div>
   <div id="modeMsg" class="hint"></div>
   <div id="tapPlay" class="warn hidden">👆 Si no parte la música, toca ▶ en el reproductor de Spotify (el celular a veces lo exige).</div>
+  <div id="ytWrap" class="hidden" style="margin-top:8px;border-radius:10px;overflow:hidden"><div id="yt"></div></div>
   <div id="embedWrap" style="margin-top:8px"><div id="embed"></div></div>
   <div class="hint">Sube el volumen y saca el modo silencio. Para escuchar canciones completas, inicia sesión con tu cuenta Premium en open.spotify.com en este mismo navegador; si no, Spotify solo pone 30 segundos.</div>
 
@@ -229,7 +230,7 @@ function fitCost(b,k){
   if(c>=t[0]&&c<=t[1]) return 0;
   return Math.min(Math.abs(c-t[0]),Math.abs(c-t[1]))*2;
 }
-function save(){try{localStorage.setItem("spin_songs",JSON.stringify(songs.map(({bpmState,...x})=>x)));localStorage.setItem("spin_goal",goal);localStorage.setItem("spin_level",level);localStorage.setItem("spin_pl",$("pl").value)}catch(e){}}
+function save(){try{localStorage.setItem("spin_songs",JSON.stringify(songs.map(({bpmState,ytState,...x})=>x)));localStorage.setItem("spin_goal",goal);localStorage.setItem("spin_level",level);localStorage.setItem("spin_pl",$("pl").value)}catch(e){}}
 
 // ---------- Parseo ----------
 function parse(text){
@@ -254,7 +255,7 @@ function renderSongs(){
      <div class="idx">${i+1}</div>
      <div style="display:flex;gap:10px;align-items:center">${s.art?`<img src="${s.art}" alt="" width="48" height="48" style="border-radius:6px;flex:none">`:""}
        <div><div class="name">${esc(s.name)}</div>
-       <div class="meta">${fmt(s.dur)} · ${s.bpmState==="calc"?'<span class="miss">calculando BPM…</span>':s.bpm?("cadencia "+cadFromBpm(s.bpm)+" rpm"):'<span class="miss">falta BPM: usa Tap</span>'}</div></div></div>
+       <div class="meta">${s.yt?"🎬 ":s.ytState==="busca"?"🎬… ":""}${fmt(s.dur)} · ${s.bpmState==="calc"?'<span class="miss">calculando BPM…</span>':s.bpm?("cadencia "+cadFromBpm(s.bpm)+" rpm"):'<span class="miss">falta BPM: usa Tap</span>'}</div></div></div>
      <div></div>
      <div class="bpmctl" style="flex-wrap:wrap">
        ${s.preview?`<button data-a="pl" data-i="${i}" title="Escuchar">▶</button>`:""}
@@ -362,6 +363,7 @@ function build(auto){
     return{...s,blk:slots[i],b,cad:c,offBeat:off,fit:fitCost(s.bpm,slots[i])}});
   if(auto){songs=order.slice();renderSongs();}
   notes(auto);renderPlan();drawChart();setPanels(0,0);pickMode();
+  if(songs.some(x=>!x.yt&&x.ytState!=="error"&&x.ytState!=="busca"))ensureYt();
   if(auto&&mode==="playlist")$("notes").insertAdjacentHTML("beforeend",'<div class="warn">Ojo: en modo playlist la música suena en el orden de Spotify. Reordena la playlist en Spotify como dice la tabla, o toca "Usar mi orden".</div>');
 }
 function notes(auto){
@@ -408,7 +410,7 @@ window.addEventListener("resize",drawChart);
 // ---------- Paneles y reproducción ----------
 let playing=false,elapsed=0,last=0,clickOn=false,actx=null,beatT=0,voiceOn=true,lastSpoken=-1;
 function unlockAudio(){try{if(!actx)actx=new (window.AudioContext||window.webkitAudioContext)();if(actx.state==="suspended")actx.resume();}catch(e){}}
-function say(t){if(!voiceOn)return;try{const u=new SpeechSynthesisUtterance(t);u.lang="es-ES";u.rate=1;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
+function say(t){if(!voiceOn)return;try{const u=new SpeechSynthesisUtterance(t);u.lang="es-ES";u.rate=1;try{if(ytP&&mode==="youtube"&&playing){ytP.setVolume(30);u.onend=()=>{try{ytP.setVolume(100)}catch(e){}};}}catch(e){}speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
 function announce(i){const p=plan[i];if(!p)return;const nx=plan[i+1];
   let t=`${p.b.name}. Cadencia ${p.cad}. Resistencia ${p.b.res.split("(")[0]}. ${p.b.pos}. Esfuerzo ${p.b.eff.replace("→","a")}.`;
   if(i===0)t="Comenzamos. "+t;
@@ -424,7 +426,7 @@ function setPanels(i,inBlk){
 }
 function tick(now){
   if(!playing)return;const dt=(now-last)/1000;last=now;
-  if(mode==="timer")elapsed+=dt;else elapsed=syncedElapsed();
+  if(mode==="timer")elapsed+=dt;else if(mode==="youtube")elapsed=ytElapsed();else elapsed=syncedElapsed();
   const tot=plan.reduce((a,q)=>a+q.dur,0);if(elapsed>=tot){playing=false;elapsed=tot;}
   const L=locate(elapsed);sel=L.i;setPanels(L.i,L.inBlk);drawChart();
   if(L.i!==lastSpoken){lastSpoken=L.i;announce(L.i);}
@@ -437,6 +439,13 @@ function beat(){const el=$("pulse");el.classList.add("on");setTimeout(()=>el.cla
   if(clickOn&&actx){try{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=1000;g.gain.setValueAtTime(.25,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.06);o.connect(g).connect(actx.destination);o.start();o.stop(actx.currentTime+.07);}catch(e){}}}
 $("btnPlay").onclick=()=>{unlockAudio();if(!plan.length){build(true);if(!plan.length)return;}lastSpoken=-1;
   pickMode();
+  if(plan.some(p=>!p.yt)&&songs.some(s=>!s.yt&&s.ytState!=="error")){ensureYt();}
+  if(mode==="youtube"){
+    if(!ytReady){$("modeMsg").innerHTML="🎬 Cargando el reproductor… toca Iniciar de nuevo en un segundo.";return;}
+    const resume=playing===false&&elapsed>0&&elapsed<blockStart(plan.length);
+    playing=true;last=performance.now();
+    if(resume){try{ytP.playVideo()}catch(e){}}else{elapsed=0;ytStart(0);}
+    requestAnimationFrame(tick);return;}
   if(mode!=="timer"){
     const resume=playing===false&&elapsed>0&&elapsed<blockStart(plan.length);
     playing=true;last=performance.now();
@@ -444,8 +453,9 @@ $("btnPlay").onclick=()=>{unlockAudio();if(!plan.length){build(true);if(!plan.le
     else{elapsed=0;cur=0;lastDur=0;lastPos=0;
       if(mode==="track")startTrack(0);else{loadIntoPlayer(plUri());setTimeout(requestPlay,600);}}
     requestAnimationFrame(tick);return;}const tot=plan.reduce((a,q)=>a+q.dur,0);if(elapsed>=tot)elapsed=0;playing=true;last=performance.now();requestAnimationFrame(tick);};
-$("btnPause").onclick=()=>{playing=false;try{ctrl&&mode!=="timer"&&ctrl.pause();}catch(e){}};
+$("btnPause").onclick=()=>{playing=false;try{if(mode==="youtube")ytP.pauseVideo();else ctrl&&mode!=="timer"&&ctrl.pause();}catch(e){}};
 function jump(d){if(!plan.length)return;
+  if(playing&&mode==="youtube"){const j=Math.max(0,Math.min(plan.length-1,cur+d));ytStart(j);return;}
   if(playing&&mode==="track"){const j=Math.max(0,Math.min(plan.length-1,cur+d));startTrack(j);return;}
   if(playing&&mode==="playlist"){$("modeMsg").innerHTML="En modo playlist, salta con ⏭ / ⏮ del reproductor de Spotify.";return;}const L=locate(elapsed);const j=Math.max(0,Math.min(plan.length-1,L.i+d));elapsed=plan.slice(0,j).reduce((a,p)=>a+p.dur,0)+0.01;sel=j;setPanels(j,0);drawChart();lastSpoken=j;announce(j);}
 $("btnPrev").onclick=()=>jump(-1);$("btnNext").onclick=()=>jump(1);
@@ -456,8 +466,10 @@ $("btnVoice").onclick=()=>{voiceOn=!voiceOn;$("btnVoice").textContent="🗣️ V
 let ctrl=null,mode="timer",cur=0,sync={pos:0,dur:0,ts:0,paused:true},lastDur=0,lastPos=0,endedFlag=false,tapTimer=null;
 function plUri(){const m=($("pl").value||"").match(/playlist[\/:]([A-Za-z0-9]{22})/);return m?"spotify:playlist:"+m[1]:null;}
 function pickMode(){
-  if(plan.length&&plan.every(p=>p.uri)) mode="track"; else if(plUri()) mode="playlist"; else mode="timer";
-  $("modeMsg").innerHTML={track:"🎵 Modo canciones: la app pone cada tema y avanza sola.",playlist:"🎵 Modo playlist: la app sigue tu playlist de Spotify en orden. Para saltar, usa ⏭ del reproductor.",timer:"⏱️ Sin enlaces de Spotify: solo cronómetro y voz. Pega el enlace de tu playlist en el paso 1 para que la música vaya sola."}[mode];
+  if(plan.length&&plan.every(p=>p.yt)) mode="youtube"; else if(plan.length&&plan.every(p=>p.uri)) mode="track"; else if(plUri()) mode="playlist"; else mode="timer";
+  try{$("ytWrap").classList.toggle("hidden",mode!=="youtube");$("embedWrap").classList.toggle("hidden",mode==="youtube"||mode==="timer");}catch(e){}
+  const missing=plan.length&&plan.some(p=>!p.yt)&&songs.some(s=>s.ytState==="busca");
+  $("modeMsg").innerHTML=missing?"🎬 Buscando las canciones en YouTube…":{youtube:"🎬 Música completa desde YouTube: la app pone cada canción y avanza sola.",track:"🎵 Modo canciones: la app pone cada tema y avanza sola.",playlist:"🎵 Modo playlist: la app sigue tu playlist de Spotify en orden. Para saltar, usa ⏭ del reproductor.",timer:"⏱️ Sin música: solo cronómetro y voz. Agrega canciones con el buscador para que suenen."}[mode];
   return mode;
 }
 function blockStart(i){return plan.slice(0,i).reduce((a,p)=>a+p.dur,0);}
@@ -513,6 +525,7 @@ $("results").addEventListener("click",e=>{const b=e.target.closest("button");if(
     songs.push(s);plan=[];renderSongs();save();b.textContent="✓";b.disabled=true;
     $("notes").innerHTML='<div class="ok">'+songs.length+' canciones en tu lista.</div>';
     if(x.previewUrl)autoBpm(s);
+    findYt(s);
   }});
 let prevBtn=null;
 function playPreview(url,btn){const a=$("prev");
@@ -547,6 +560,38 @@ async function autoBpm(s){
   try{const v=await detectBpm(s.preview);if(s.bpm==null||s.bpmAuto){s.bpm=v;s.bpmAuto=true;}}catch(e){}
   s.bpmState="";renderSongs();save();
 }
+
+// ---------- YouTube (música completa dentro de la app) ----------
+const YT_KEY="AIzaSyCaM-ps-f1kgyL28nTuWrtASGE2jPcRBDU";
+let ytP=null,ytReady=false;
+function ytCacheGet(k){try{return (JSON.parse(localStorage.getItem("spin_ytc")||"{}"))[k]}catch(e){return undefined}}
+function ytCacheSet(k,v){try{const c=JSON.parse(localStorage.getItem("spin_ytc")||"{}");c[k]=v;localStorage.setItem("spin_ytc",JSON.stringify(c))}catch(e){}}
+async function findYt(s){
+  if(s.yt||s.ytState==="busca")return;
+  const key=s.name.toLowerCase();const c=ytCacheGet(key);if(c){s.yt=c;renderSongs();save();return;}
+  s.ytState="busca";renderSongs();
+  try{const q=encodeURIComponent(s.name.replace(/\s+-\s+/," ")+" official audio");
+    const d=await (await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=1&q=${q}&key=${YT_KEY}`)).json();
+    if(d.error)throw d.error;const it=d.items&&d.items[0];if(it&&it.id&&it.id.videoId){s.yt=it.id.videoId;ytCacheSet(key,s.yt);}
+    s.ytState="";
+  }catch(e){s.ytState="error";s.ytErr=(e&&e.message)||"sin conexión";}
+  plan.forEach(p=>{if(!p.yt&&p.name===s.name&&s.yt)p.yt=s.yt;});
+  renderSongs();save();pickMode();
+}
+async function ensureYt(){for(const s of songs){if(!s.yt&&s.ytState!=="busca")await findYt(s);}
+  plan.forEach(p=>{const m=songs.find(x=>x.name===p.name);if(m&&m.yt)p.yt=m.yt;});pickMode();}
+window.onYouTubeIframeAPIReady=()=>{
+  ytP=new YT.Player("yt",{width:"100%",height:"200",playerVars:{playsinline:1,rel:0,modestbranding:1},
+    events:{onReady:()=>{ytReady=true},onStateChange:e=>{
+      if(e.data===1)$("tapPlay").classList.add("hidden");
+      if(e.data===0&&playing&&mode==="youtube"){if(cur<plan.length-1)ytStart(cur+1);else{playing=false;say("Clase terminada. ¡Bien hecho!");}}
+    }}});
+};
+function ytStart(i){cur=i;sel=i;try{ytP.loadVideoById(plan[i].yt);}catch(e){}
+  clearTimeout(tapTimer);tapTimer=setTimeout(()=>{try{if(ytP.getPlayerState()!==1)$("tapPlay").classList.remove("hidden");}catch(e){}},4000);}
+function ytElapsed(){let t=0,d=0;try{t=ytP.getCurrentTime()||0;d=ytP.getDuration()||0;}catch(e){}
+  if(d>5&&Math.abs(plan[cur].dur-d)>1){plan[cur].dur=d;renderPlan();}
+  return blockStart(cur)+Math.min(t,plan[cur].dur-0.05);}
 
 // ---------- Mis clases ----------
 function getSaved(){try{return JSON.parse(localStorage.getItem("spin_classes")||"[]")}catch(e){return []}}
@@ -593,5 +638,6 @@ try{const t=localStorage.getItem("spin_songs");if(t){songs=JSON.parse(t)||[];}co
 renderLevels();renderGoals();renderSongs();drawChart();pickMode();renderSaved();
 </script>
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
+<script src="https://www.youtube.com/iframe_api" async></script>
 </body>
 </html>
