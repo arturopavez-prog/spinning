@@ -93,7 +93,7 @@ button.sel{outline:3px solid var(--acc);background:#3a2615}
 
 <section>
   <h2><span class="n">2</span>Tu lista y su BPM</h2>
-  <div class="hint">La app calcula el BPM escuchando un adelanto de cada canción (marcado ≈). Si no te convence, ajústalo con <b>+</b>/<b>−</b> o con <b>Tap</b>: toca ▶, y luego toca el botón al ritmo del bombo.</div>
+  <div class="hint">La app busca el BPM en una base de datos musical; si no lo encuentra, lo estima escuchando un adelanto (marcado ≈, revísalo). Arrastra con <b>☰</b> para cambiar el orden. Si no te convence, ajústalo con <b>+</b>/<b>−</b> o con <b>Tap</b>: toca ▶, y luego toca el botón al ritmo del bombo.</div>
   <div id="songs"><div class="hint">Aún no hay canciones.</div></div>
   <div id="tapBox" class="hidden" style="margin-top:10px">
     <div class="hint">Tap para: <b id="tapName"></b></div>
@@ -125,8 +125,9 @@ button.sel{outline:3px solid var(--acc);background:#3a2615}
     <span><i style="background:var(--z3)"></i>Z3 Tempo</span>
     <span><i style="background:var(--z4)"></i>Z4 Umbral</span>
     <span><i style="background:var(--z5)"></i>Z5 Máximo</span>
+    <span>┅ curva ideal del objetivo</span>
   </div>
-  <div class="hint">Toca una barra para ver el detalle. La altura es la intensidad y el ancho, la duración.</div>
+  <div class="hint">Toca una barra para ver el detalle. La altura es la intensidad, el ancho la duración y la línea punteada la curva ideal: "Ordenar" acomoda las canciones para seguirla.</div>
 
   <div class="panels">
     <div class="panel"><div class="l">Zona de potencia</div><div class="v" id="pZone">—</div></div>
@@ -251,21 +252,31 @@ function renderSongs(){
   const box=$("songs");
   if(!songs.length){box.innerHTML='<div class="hint">Aún no hay canciones.</div>';return;}
   box.innerHTML=songs.map((s,i)=>`
-   <div class="song" style="grid-template-columns:28px 1fr">
-     <div class="idx">${i+1}</div>
+   <div class="song" data-i="${i}" style="grid-template-columns:40px 1fr">
+     <div class="idx handle" data-i="${i}" title="Arrastra para mover" style="cursor:grab;touch-action:none;user-select:none;font-size:20px;text-align:center">☰<div style="font-size:12px">${i+1}</div></div>
      <div style="display:flex;gap:10px;align-items:center">${s.art?`<img src="${s.art}" alt="" width="48" height="48" style="border-radius:6px;flex:none">`:""}
        <div><div class="name">${esc(s.name)}</div>
-       <div class="meta">${s.yt?"🎬 ":s.ytState==="busca"?"🎬… ":""}${fmt(s.dur)} · ${s.bpmState==="calc"?'<span class="miss">calculando BPM…</span>':s.bpm?("cadencia "+cadFromBpm(s.bpm)+" rpm"):'<span class="miss">falta BPM: usa Tap</span>'}</div></div></div>
+       <div class="meta">${s.yt?"🎬 ":s.ytState==="busca"?"🎬… ":""}${fmt(s.dur)} · ${s.bpmState==="calc"?'<span class="miss">calculando BPM…</span>':s.bpm?("cadencia "+cadFromBpm(s.bpm)+" rpm"+(s.bpmSrc==="db"?" · BPM de base de datos":s.bpmSrc==="det"?" · BPM estimado, revísalo":"")):'<span class="miss">falta BPM: usa Tap</span>'}</div></div></div>
      <div></div>
      <div class="bpmctl" style="flex-wrap:wrap">
        ${s.preview?`<button data-a="pl" data-i="${i}" title="Escuchar">▶</button>`:""}
        <button data-a="m" data-i="${i}">−</button><span class="v ${s.bpm?"":"miss"}">${s.bpm?(s.bpmAuto?"≈":"")+s.bpm:"?"}</span><button data-a="p" data-i="${i}">+</button>
        <button data-a="t" data-i="${i}" title="Tap tempo">Tap</button>
-       <button data-a="u" data-i="${i}" title="Subir">↑</button>
+       <button data-a="u" data-i="${i}" title="Subir">↑</button><button data-a="d" data-i="${i}" title="Bajar">↓</button>
        <button data-a="x" data-i="${i}" title="Quitar">✕</button>
      </div>
    </div>`).join("");
 }
+function afterReorder(){const had=plan.length;renderSongs();save();if(had)build(false);}
+let drag=null;
+$("songs").addEventListener("pointerdown",e=>{const h=e.target.closest(".handle");if(!h)return;e.preventDefault();
+  const row=h.closest(".song");drag={row};row.style.opacity=".5";row.style.outline="2px solid var(--acc)";});
+window.addEventListener("pointermove",e=>{if(!drag)return;e.preventDefault();const box=$("songs");
+  const rows=[...box.querySelectorAll(".song")].filter(r=>r!==drag.row);
+  let before=null;for(const r of rows){const b=r.getBoundingClientRect();if(e.clientY<b.top+b.height/2){before=r;break;}}
+  if(before!==drag.row.nextSibling)box.insertBefore(drag.row,before);},{passive:false});
+window.addEventListener("pointerup",()=>{if(!drag)return;const box=$("songs");
+  const idx=[...box.querySelectorAll(".song")].map(r=>+r.dataset.i);songs=idx.map(i=>songs[i]);drag=null;afterReorder();});
 function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 $("songs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b) return; const i=+b.dataset.i, a=b.dataset.a;
@@ -273,7 +284,8 @@ $("songs").addEventListener("click",e=>{
   if(a==="p"){songs[i].bpm=Math.min(220,(songs[i].bpm||120)+1);songs[i].bpmAuto=false;}
   if(a==="x"){songs.splice(i,1);}
   if(a==="pl"){playPreview(songs[i].preview,b);return;}
-  if(a==="u"&&i>0){[songs[i-1],songs[i]]=[songs[i],songs[i-1]];}
+  if(a==="u"&&i>0){[songs[i-1],songs[i]]=[songs[i],songs[i-1]];afterReorder();return;}
+  if(a==="d"&&i<songs.length-1){[songs[i+1],songs[i]]=[songs[i],songs[i+1]];afterReorder();return;}
   if(a==="t"){openTap(i);return;}
   renderSongs();
 });
@@ -305,7 +317,52 @@ function renderLevels(){
 $("levels").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;level=b.dataset.l;renderLevels();save();if(plan.length)build(true);});
 $("goals").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;goal=b.dataset.g;renderGoals();save();if(plan.length)build(true);});
 
-// ---------- Armado de la clase ----------
+// ---------- Armado de la clase: curva ideal + asignación óptima ----------
+function targetCurve(n){
+  // intensidad ideal (1–5) para cada posición según objetivo y nivel
+  const warm=(level==="principiante"&&n>=8)?2:1, t=[];
+  for(let i=0;i<warm;i++)t.push(i===0?1.5:1.8);
+  const m=Math.max(0,n-warm-1);
+  for(let k=0;k<m;k++){const u=(k+0.5)/m;let v;
+    if(goal==="grasa")v=2.2+1.2*Math.sin(Math.PI*u)+0.45*Math.sin(5*Math.PI*u);
+    else if(goal==="resistencia")v=u<0.15?2+6*u:3.1+0.6*Math.sin(Math.PI*u);
+    else if(goal==="gluteo")v=(k%3===2)?1.5:3.7;
+    else if(goal==="hiit")v=(k%2===0)?4.8:1.2;
+    else v=1.6+0.4*Math.sin(Math.PI*u);
+    if(level==="principiante")v=Math.min(3,1.3+(v-1)*0.55);
+    if(level==="avanzado")v=Math.min(5,v+0.3);
+    t.push(v);}
+  if(n>1)t.push(1);
+  return {t:t.slice(0,n),warm};
+}
+function allowedBlocks(){
+  let a=["recuperacion","llano","tempo","subida","fuerza","umbral","sprint"];
+  if(level==="principiante")a=["recuperacion","llano","tempo","subida"];
+  if(goal==="suave")a=["recuperacion","llano"];
+  return a;
+}
+function posBlock(song,i,n,t,warm){
+  if(n>1&&i<warm)return {k:"calentamiento",c:fitCost(song.bpm,"calentamiento")*0.6};
+  if(n>1&&i===n-1)return {k:"calma",c:fitCost(song.bpm,"calma")*0.6};
+  let best=null;
+  allowedBlocks().forEach(k=>{const c=Math.abs(blk(k).zone-t[i])*10+fitCost(song.bpm,k)*0.6;if(!best||c<best.c)best={k,c};});
+  return best;
+}
+function hungarian(C){const n=C.length,u=Array(n+1).fill(0),v=Array(n+1).fill(0),p=Array(n+1).fill(0),way=Array(n+1).fill(0);
+  for(let i=1;i<=n;i++){p[0]=i;let j0=0;const minv=Array(n+1).fill(Infinity),used=Array(n+1).fill(false);
+    do{used[j0]=true;const i0=p[j0];let delta=Infinity,j1=0;
+      for(let j=1;j<=n;j++)if(!used[j]){const cur=C[i0-1][j-1]-u[i0]-v[j];if(cur<minv[j]){minv[j]=cur;way[j]=j0;}if(minv[j]<delta){delta=minv[j];j1=j;}}
+      for(let j=0;j<=n;j++){if(used[j]){u[p[j]]+=delta;v[j]-=delta;}else minv[j]-=delta;}j0=j1;}while(p[j0]!==0);
+    do{const j1=way[j0];p[j0]=p[j1];j0=j1;}while(j0);}
+  const ans=Array(n);for(let j=1;j<=n;j++)ans[p[j]-1]=j-1;return ans;}
+function curveOrder(list){
+  const n=list.length,{t,warm}=targetCurve(n);
+  const C=list.map(sg=>t.map((_,i)=>posBlock(sg,i,n,t,warm).c));
+  const asg=hungarian(C);const order=Array(n);asg.forEach((pos,si)=>order[pos]=list[si]);
+  return {order,slots:order.map((sg,i)=>posBlock(sg,i,n,t,warm).k),targets:t};
+}
+function curveBlocks(list){const n=list.length,{t,warm}=targetCurve(n);return {slots:list.map((sg,i)=>posBlock(sg,i,n,t,warm).k),targets:t};}
+
 function slotsFor(n){
   if(n===1) return ["llano"];
   if(n===2) return ["calentamiento","calma"];
@@ -355,20 +412,21 @@ function slotsForGiven(list){
 }
 function build(auto){
   if(!songs.length){$("notes").innerHTML='<div class="warn">Primero carga tus canciones (paso 1).</div>';return;}
-  let slots, order;
-  if(auto){slots=slotsFor(songs.length);order=assign(slots,songs);}
-  else{order=songs.slice();slots=slotsForGiven(order);}
+  let slots, order, targets;
+  if(auto){const res=curveOrder(songs);order=res.order;slots=res.slots;targets=res.targets;}
+  else{order=songs.slice();const res=curveBlocks(order);slots=res.slots;targets=res.targets;}
   plan=order.map((s,i)=>{const b=blk(slots[i]);let c=s.bpm?cadFromBpm(s.bpm,b.cad):null,off=false;
     if(c==null||c<b.cad[0]-3||c>b.cad[1]+3){off=!!s.bpm;c=Math.round(Math.min(b.cad[1],Math.max(b.cad[0],c||((b.cad[0]+b.cad[1])/2))));}
-    return{...s,blk:slots[i],b,cad:c,offBeat:off,fit:fitCost(s.bpm,slots[i])}});
-  if(auto){songs=order.slice();renderSongs();}
+    const why=off?"no calza bien con su ritmo: cámbiala si puedes":slots[i]==="calentamiento"?"ritmo cómodo para entrar en calor":slots[i]==="calma"?"para bajar pulsaciones":`su ritmo (${c} rpm) calza con ${b.name.toLowerCase()}`;
+    return{...s,blk:slots[i],b,cad:c,offBeat:off,fit:fitCost(s.bpm,slots[i]),target:targets[i],why}});
+  if(auto){const moved=order.filter((x,i)=>songs[i]!==x).length;songs=order.slice();renderSongs();window._moved=moved;}
   notes(auto);renderPlan();drawChart();setPanels(0,0);pickMode();
   if(songs.some(x=>!x.yt&&x.ytState!=="error"&&x.ytState!=="busca"))ensureYt();
   if(auto&&mode==="playlist")$("notes").insertAdjacentHTML("beforeend",'<div class="warn">Ojo: en modo playlist la música suena en el orden de Spotify. Reordena la playlist en Spotify como dice la tabla, o toca "Usar mi orden".</div>');
 }
 function notes(auto){
   const n=[]; const tot=plan.reduce((a,p)=>a+p.dur,0);
-  n.push(`<div class="ok">Clase de <b>${fmt(tot)}</b> min · ${plan.length} canciones · nivel <b>${LEVELS[level].name}</b> · objetivo <b>${GOALS[goal].name}</b>${auto?" (orden automático)":" (tu orden)"}.</div>`);
+  n.push(`<div class="ok">Clase de <b>${fmt(tot)}</b> min · ${plan.length} canciones · nivel <b>${LEVELS[level].name}</b> · objetivo <b>${GOALS[goal].name}</b>${auto?" (orden automático)":" (tu orden)"}.${auto?` Moví ${window._moved||0} canción(es) para seguir la curva de ${GOALS[goal].name.toLowerCase()}.`:""}</div>`);
   if(level==="principiante"&&tot>45*60) n.push('<div class="warn">Para principiantes, más de 45 min es mucho. Saca canciones y apunta a 25–40 min (6–10 temas).</div>');
   if(level==="principiante"&&plan.some(p=>p.cad>100)) n.push('<div class="warn">Hay cadencias sobre 100 rpm: un principiante puede rebotar en el sillín. Pedalea a medio tiempo o cambia el tema.</div>');
   if(level==="principiante"&&goal==="hiit") n.push('<div class="warn">HIIT en nivel principiante: cambié los sprints por bloques de tempo. Los sprints de verdad, después de unas 6–8 semanas.</div>');
@@ -383,7 +441,7 @@ function notes(auto){
 function renderPlan(){
   $("plan").innerHTML='<tr><th>#</th><th>Canción</th><th>Bloque</th><th>Cadencia</th><th>Zona</th><th>Resistencia · posición</th></tr>'+
   plan.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.name)}<br><span class="hint">${p.bpm?p.bpm+" BPM":"BPM ?"} · ${fmt(p.dur)}</span></td>
-   <td><span class="tag" style="background:${ZCOL(p.b.zone)}">${p.b.name}</span></td><td>${p.cad} rpm${p.offBeat?'<br><span class="hint">a tu ritmo, no al beat</span>':''}</td><td>${p.b.zoneTxt}<br><span class="hint">${p.b.eff}</span></td><td>${p.b.res}<br><span class="hint">${p.b.pos}</span></td></tr>`).join("");
+   <td><span class="tag" style="background:${ZCOL(p.b.zone)}">${p.b.name}</span><br><span class="hint">${p.why||""}</span></td><td>${p.cad} rpm${p.offBeat?'<br><span class="hint">a tu ritmo, no al beat</span>':''}</td><td>${p.b.zoneTxt}<br><span class="hint">${p.b.eff}</span></td><td>${p.b.res}<br><span class="hint">${p.b.pos}</span></td></tr>`).join("");
 }
 
 // ---------- Gráfico ----------
@@ -401,6 +459,8 @@ function drawChart(){
     cx.fillStyle="#bbb";cx.font="11px system-ui";if(w>14)cx.fillText(i+1,x+3,H-2);
     bars.push({x,w,i});x+=w+3;
   });
+  if(plan[0]&&plan[0].target!=null){cx.save();cx.setLineDash([5,4]);cx.strokeStyle="#fff";cx.globalAlpha=.8;cx.lineWidth=2;cx.beginPath();
+    bars.forEach((b,k)=>{const y=H-14-(plan[k].target/5)*(H-24),xm=b.x+b.w/2;k?cx.lineTo(xm,y):cx.moveTo(xm,y);});cx.stroke();cx.restore();}
   if(playing||elapsed>0){const px=pad+Math.min(1,elapsed/tot)*gw;cx.strokeStyle="#fff";cx.lineWidth=2;cx.beginPath();cx.moveTo(px,0);cx.lineTo(px,H-14);cx.stroke();cx.lineWidth=1;}
 }
 cv.addEventListener("click",e=>{const r=cv.getBoundingClientRect(),x=e.clientX-r.left;const b=bars.find(b=>x>=b.x&&x<=b.x+b.w+3);if(!b)return;sel=b.i;
@@ -501,6 +561,18 @@ function syncedElapsed(){const p=sync.pos+(sync.paused?0:performance.now()-sync.
 
 // ---------- Buscador (catálogo de Apple, gratis y sin cuentas) ----------
 let qTimer=null,qSeq=0;
+function jsonp(url){return new Promise((res,rej)=>{const cb="jp"+Date.now()+Math.floor(Math.random()*1e5);const sc=document.createElement("script");
+  const done=()=>{try{delete window[cb]}catch(e){window[cb]=undefined}sc.remove();};
+  window[cb]=d=>{done();res(d)};sc.onerror=()=>{done();rej("net")};sc.src=url+(url.includes("?")?"&":"?")+"callback="+cb;
+  document.body.appendChild(sc);setTimeout(()=>rej("timeout"),9000);});}
+async function deezerBpm(sg){
+  const parts=sg.name.split(" - ");const artist=sg.artist||parts[0]||"";let title=sg.title||parts.slice(1).join(" - ")||sg.name;
+  title=title.replace(/\s*[\(\[].*?[\)\]]/g,"").trim();const enc=encodeURIComponent;
+  let d=await jsonp(`https://api.deezer.com/search?q=${enc(`artist:"${artist}" track:"${title}"`)}&limit=1&output=jsonp`);
+  if(!d||!d.data||!d.data.length)d=await jsonp(`https://api.deezer.com/search?q=${enc(artist+" "+title)}&limit=1&output=jsonp`);
+  const t=d&&d.data&&d.data[0];if(!t)return null;
+  const tr=await jsonp(`https://api.deezer.com/track/${t.id}?output=jsonp`);
+  return tr&&tr.bpm>40?Math.round(tr.bpm):null;}
 function itunes(term){return new Promise((res,rej)=>{const cb="it"+Date.now()+Math.floor(Math.random()*1e5);const sc=document.createElement("script");
   const done=()=>{try{delete window[cb]}catch(e){window[cb]=undefined}sc.remove();};
   window[cb]=d=>{done();res(d)};sc.onerror=()=>{done();rej("net")};
@@ -521,10 +593,10 @@ $("results").addEventListener("click",e=>{const b=e.target.closest("button");if(
   if(b.dataset.r==="pv"){playPreview(x.previewUrl,b);return;}
   if(b.dataset.r==="add"){
     if(songs.some(s=>s.id===x.trackId)){b.textContent="✓";return;}
-    const s={id:x.trackId,name:`${x.artistName} - ${x.trackName}`,dur:Math.round((x.trackTimeMillis||240000)/1000),bpm:null,art:x.artworkUrl100,preview:x.previewUrl,bpmAuto:false,bpmState:x.previewUrl?"calc":""};
+    const s={id:x.trackId,name:`${x.artistName} - ${x.trackName}`,dur:Math.round((x.trackTimeMillis||240000)/1000),bpm:null,art:x.artworkUrl100,preview:x.previewUrl,bpmAuto:false,bpmState:"calc",artist:x.artistName,title:x.trackName};
     songs.push(s);plan=[];renderSongs();save();b.textContent="✓";b.disabled=true;
     $("notes").innerHTML='<div class="ok">'+songs.length+' canciones en tu lista.</div>';
-    if(x.previewUrl)autoBpm(s);
+    autoBpm(s);
     findYt(s);
   }});
 let prevBtn=null;
@@ -557,7 +629,12 @@ async function detectBpm(url){
   return Math.round(bpm);
 }
 async function autoBpm(s){
-  try{const v=await detectBpm(s.preview);if(s.bpm==null||s.bpmAuto){s.bpm=v;s.bpmAuto=true;}}catch(e){}
+  s.bpmState="calc";renderSongs();
+  let dz=null,det=null;
+  try{dz=await deezerBpm(s);}catch(e){}
+  if(!dz&&s.preview){try{det=await detectBpm(s.preview);}catch(e){}}
+  const v=dz||det;
+  if(v&&(s.bpm==null||s.bpmAuto)){s.bpm=v;s.bpmAuto=!dz;s.bpmSrc=dz?"db":"det";}
   s.bpmState="";renderSongs();save();
 }
 
@@ -615,7 +692,7 @@ $("saved").addEventListener("click",e=>{const b=e.target.closest("button");if(!b
 });
 
 // ---------- Botones principales ----------
-$("btnLoad").onclick=()=>{songs=songs.concat(parse($("txt").value));$("txt").value="";if(plUri())loadIntoPlayer(plUri());plan=[];sel=-1;elapsed=0;renderSongs();save();$("notes").innerHTML=songs.length?'<div class="ok">'+songs.length+' canciones cargadas. Revisa los BPM y toca "Ordenar canciones".</div>':"";drawChart();};
+$("btnLoad").onclick=()=>{const nw=parse($("txt").value);songs=songs.concat(nw);$("txt").value="";nw.filter(x=>!x.bpm).forEach(x=>autoBpm(x));if(plUri())loadIntoPlayer(plUri());plan=[];sel=-1;elapsed=0;renderSongs();save();$("notes").innerHTML=songs.length?'<div class="ok">'+songs.length+' canciones cargadas. Revisa los BPM y toca "Ordenar canciones".</div>':"";drawChart();};
 $("btnClear").onclick=()=>{$("txt").value="";$("results").innerHTML="";$("q").value="";songs=[];plan=[];renderSongs();renderPlan();drawChart();$("notes").innerHTML="";save();};
 $("btnBuild").onclick=()=>build(true);
 const DEMO=`Luis Fonsi - Despacito 89 3:48
