@@ -58,6 +58,24 @@ button.sel{outline:3px solid var(--acc);background:#3a2615}
 .tap{font-size:20px;padding:20px;width:100%}
 .hidden{display:none}
 .big{font-size:30px;font-weight:800}
+.cm-only{display:none}
+body.classmode{overflow:hidden}
+body.classmode .cm-only{display:flex}
+body.classmode .cm-hide{display:none}
+body.classmode #live{position:fixed;left:0;top:0;width:50vw;height:100vh;overflow-y:auto;background:var(--bg);z-index:60;padding:12px;box-sizing:border-box}
+body.classmode #ytWrap{position:fixed!important;right:0;top:0;width:50vw;height:100vh;margin:0!important;border-radius:0!important;z-index:60;background:#000;display:block!important}
+body.classmode #ytWrap iframe,body.classmode #yt{width:100%!important;height:100%!important}
+body.classmode #chart{height:28vh}
+body.classmode .panels{grid-template-columns:1fr 1fr}
+body.classmode .panel.wide{grid-column:span 2}
+body.classmode .panel .v{font-size:clamp(18px,2.2vw,34px)}
+body.classmode.novideo #live{width:100vw}
+@media (max-aspect-ratio:1/1){
+  body.classmode #ytWrap{width:100vw;height:38vh}
+  body.classmode #live{top:38vh;width:100vw;height:62vh}
+  body.classmode.novideo #live{top:0;height:100vh}
+  body.classmode #chart{height:22vh}
+}
 @media(min-width:640px){.panels{grid-template-columns:repeat(4,1fr)}.panel.wide{grid-column:span 2}}
 </style>
 </head>
@@ -118,6 +136,9 @@ button.sel{outline:3px solid var(--acc);background:#3a2615}
   <h2><span class="n">4</span>Tu clase</h2>
   <div class="row"><button class="pri" id="btnBuild">Ordenar canciones</button><button id="btnKeep">Usar mi orden</button></div>
   <div id="notes" style="margin-top:8px"></div>
+  <div id="live">
+  <div class="row cm-only" style="justify-content:space-between;align-items:center;margin-bottom:6px">
+    <b id="cmTitle" style="font-size:18px">Clase en curso</b><button id="btnExit">✕ Salir</button></div>
   <canvas id="chart"></canvas>
   <div class="legend">
     <span><i style="background:var(--z1)"></i>Z1 Recuperación</span>
@@ -127,7 +148,7 @@ button.sel{outline:3px solid var(--acc);background:#3a2615}
     <span><i style="background:var(--z5)"></i>Z5 Máximo</span>
     <span>┅ curva ideal del objetivo</span>
   </div>
-  <div class="hint">Toca una barra para ver el detalle. La altura es la intensidad, el ancho la duración y la línea punteada la curva ideal: "Ordenar" acomoda las canciones para seguirla.</div>
+  <div class="hint cm-hide">Toca una barra para ver el detalle. La altura es la intensidad, el ancho la duración y la línea punteada la curva ideal: "Ordenar" acomoda las canciones para seguirla.</div>
 
   <div class="panels">
     <div class="panel"><div class="l">Zona de potencia</div><div class="v" id="pZone">—</div></div>
@@ -145,7 +166,8 @@ button.sel{outline:3px solid var(--acc);background:#3a2615}
     <button id="btnVoice">🗣️ Voz del profe: sí</button>
   </div>
   <div id="modeMsg" class="hint"></div>
-  <div id="tapPlay" class="warn hidden">👆 Si no parte la música, toca ▶ en el reproductor de Spotify (el celular a veces lo exige).</div>
+  <div id="tapPlay" class="warn hidden">👆 Si no parte la música, toca ▶ sobre el video o el reproductor (el celular a veces lo exige).</div>
+  </div>
   <div id="ytWrap" class="hidden" style="margin-top:8px;border-radius:10px;overflow:hidden"><div id="yt"></div></div>
   <div id="embedWrap" style="margin-top:8px"><div id="embed"></div></div>
   <div class="hint">Sube el volumen y saca el modo silencio. Para escuchar canciones completas, inicia sesión con tu cuenta Premium en open.spotify.com en este mismo navegador; si no, Spotify solo pone 30 segundos.</div>
@@ -498,7 +520,7 @@ function tick(now){
 function beat(){const el=$("pulse");el.classList.add("on");setTimeout(()=>el.classList.remove("on"),90);
   if(clickOn&&actx){try{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=1000;g.gain.setValueAtTime(.25,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.06);o.connect(g).connect(actx.destination);o.start();o.stop(actx.currentTime+.07);}catch(e){}}}
 $("btnPlay").onclick=()=>{unlockAudio();if(!plan.length){build(true);if(!plan.length)return;}lastSpoken=-1;
-  pickMode();
+  pickMode();enterClass();
   if(plan.some(p=>!p.yt)&&songs.some(s=>!s.yt&&s.ytState!=="error")){ensureYt();}
   if(mode==="youtube"){
     if(!ytReady){$("modeMsg").innerHTML="🎬 Cargando el reproductor… toca Iniciar de nuevo en un segundo.";return;}
@@ -513,6 +535,15 @@ $("btnPlay").onclick=()=>{unlockAudio();if(!plan.length){build(true);if(!plan.le
     else{elapsed=0;cur=0;lastDur=0;lastPos=0;
       if(mode==="track")startTrack(0);else{loadIntoPlayer(plUri());setTimeout(requestPlay,600);}}
     requestAnimationFrame(tick);return;}const tot=plan.reduce((a,q)=>a+q.dur,0);if(elapsed>=tot)elapsed=0;playing=true;last=performance.now();requestAnimationFrame(tick);};
+function enterClass(){document.body.classList.add("classmode");document.body.classList.toggle("novideo",mode!=="youtube");
+  try{const el=document.documentElement;(el.requestFullscreen||el.webkitRequestFullscreen).call(el).catch(()=>{});}catch(e){}
+  setTimeout(drawChart,150);}
+function exitClass(){document.body.classList.remove("classmode","novideo");
+  try{if(document.fullscreenElement)(document.exitFullscreen||document.webkitExitFullscreen).call(document);}catch(e){}
+  setTimeout(drawChart,150);}
+$("btnExit").onclick=()=>{$("btnPause").click();exitClass();};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&document.body.classList.contains("classmode"))exitClass();});
+document.addEventListener("fullscreenchange",()=>setTimeout(drawChart,150));
 $("btnPause").onclick=()=>{playing=false;try{if(mode==="youtube")ytP.pauseVideo();else ctrl&&mode!=="timer"&&ctrl.pause();}catch(e){}};
 function jump(d){if(!plan.length)return;
   if(playing&&mode==="youtube"){const j=Math.max(0,Math.min(plan.length-1,cur+d));ytStart(j);return;}
