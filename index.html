@@ -165,6 +165,11 @@ body.classmode.novideo #live{width:100vw}
     <button id="btnClick">🔈 Metrónomo: no</button>
     <button id="btnVoice">🗣️ Voz del profe: sí</button>
   </div>
+  <div class="row cm-hide" style="margin-top:8px;align-items:center">
+    <select id="voiceSel" style="flex:1;min-width:200px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px"></select>
+    <button id="btnTestVoice">▶ Probar voz</button>
+  </div>
+  <div class="hint cm-hide">💡 Las voces más humanas son las que dicen <b>Natural</b> u <b>Online</b>; aparecen si abres la app en el navegador <b>Microsoft Edge</b>. En Chrome, elige una voz <b>Google</b>.</div>
   <div id="modeMsg" class="hint"></div>
   <div id="tapPlay" class="warn hidden">👆 Si no parte la música, toca ▶ sobre el video o el reproductor (el celular a veces lo exige).</div>
   </div>
@@ -492,12 +497,51 @@ window.addEventListener("resize",drawChart);
 // ---------- Paneles y reproducción ----------
 let playing=false,elapsed=0,last=0,clickOn=false,actx=null,beatT=0,voiceOn=true,lastSpoken=-1;
 function unlockAudio(){try{if(!actx)actx=new (window.AudioContext||window.webkitAudioContext)();if(actx.state==="suspended")actx.resume();}catch(e){}}
-function say(t){if(!voiceOn)return;try{const u=new SpeechSynthesisUtterance(t);u.lang="es-ES";u.rate=1;try{if(ytP&&mode==="youtube"&&playing){ytP.setVolume(30);u.onend=()=>{try{ytP.setVolume(100)}catch(e){}};}}catch(e){}speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
-function announce(i){const p=plan[i];if(!p)return;const nx=plan[i+1];
-  let t=`${p.b.name}. Cadencia ${p.cad}. Resistencia ${p.b.res.split("(")[0]}. ${p.b.pos}. Esfuerzo ${p.b.eff.replace("→","a")}.`;
-  if(i===0)t="Comenzamos. "+t;
-  if(!nx)t+=" Última canción, a bajar pulsaciones y estirar.";
-  say(t);}
+// ---------- Voz del profe ----------
+let voices=[],voicePick=null;
+function scoreVoice(v){let sc=0;const n=v.name.toLowerCase();
+  if(/natural|neural|online/.test(n))sc+=50;if(/google/.test(n))sc+=25;if(/premium|enhanced|mejorad/.test(n))sc+=30;
+  if(/es-cl/i.test(v.lang))sc+=12;else if(/es-(mx|us|419|ar|co)/i.test(v.lang))sc+=8;else if(/es-es/i.test(v.lang))sc+=4;
+  if(v.localService===false)sc+=5;return sc;}
+function loadVoices(){try{voices=speechSynthesis.getVoices().filter(v=>/^es/i.test(v.lang)).sort((a,b)=>scoreVoice(b)-scoreVoice(a));}catch(e){voices=[];}
+  let saved=null;try{saved=localStorage.getItem("spin_voice")}catch(e){}
+  voicePick=voices.find(v=>v.name===saved)||voices[0]||null;
+  const sel=$("voiceSel");if(!sel)return;
+  sel.innerHTML=voices.length?voices.map(v=>`<option ${voicePick&&v.name===voicePick.name?"selected":""}>${esc(v.name)} (${v.lang})</option>`).join(""):"<option>Voz por defecto del equipo</option>";}
+try{loadVoices();speechSynthesis.onvoiceschanged=loadVoices;}catch(e){}
+$("voiceSel").onchange=()=>{voicePick=voices[$("voiceSel").selectedIndex]||null;try{localStorage.setItem("spin_voice",voicePick?voicePick.name:"")}catch(e){}};
+$("btnTestVoice").onclick=()=>{const was=voiceOn;voiceOn=true;say(pick(["¡Hola! Soy tu profe. Hoy vamos a pasarlo bien, a darle con todo.","¡Vamos que se puede! Respira, hombros sueltos, y a pedalear."]));voiceOn=was;};
+function pick(a){return a[Math.floor(Math.random()*a.length)];}
+function say(t){if(!voiceOn)return;try{const u=new SpeechSynthesisUtterance(t);
+  if(voicePick){u.voice=voicePick;u.lang=voicePick.lang;}else u.lang="es-ES";
+  u.rate=1.04;u.pitch=1.02;
+  try{if(ytP&&mode==="youtube"&&playing){ytP.setVolume(30);u.onend=()=>{try{ytP.setVolume(100)}catch(e){}};}}catch(e){}
+  speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
+function resWord(p){return p.b.res.split("(")[0].trim().toLowerCase();}
+function intro(p){const k=p.blk,c=p.cad;
+  const T={
+    calentamiento:[`Partimos tranquilos. Pedalea suave, a unas ${c} pedaladas, y deja que el cuerpo entre en calor.`,`Bienvenidos. Empezamos suave, resistencia baja, sentados, buscando un ritmo cómodo de ${c}.`],
+    llano:[`Llano. Sentados, ritmo constante de ${c}. Resistencia ${resWord(p)}: que se sienta el camino, pero que puedas conversar.`,`Vamos al llano. Ruedas firmes a ${c} pedaladas, espalda larga, respira profundo.`],
+    tempo:[`Ahora tempo. Sube un poco la resistencia y sostén ${c} pedaladas. Esfuerzo moderado, se tiene que notar.`,`Bloque de tempo. Un cuartito de vuelta más a la perilla y mantén el ritmo en ${c}.`],
+    subida:[`¡Se viene la subida! Carga la resistencia, baja el ritmo a ${c}. ${p.b.pos}. Empuja con las piernas, no con los brazos.`,`Subida. Resistencia ${resWord(p)}, ritmo de ${c}. Paso a paso, que esta la subimos juntos.`],
+    fuerza:[`Fuerza de glúteo. Resistencia muy alta, ritmo lento de ${c}. De pie, cadera atrás, empuja desde el talón.`,`Ahora trabajamos glúteo. Mucha carga, ${c} pedaladas, cadera hacia atrás y abdomen apretado.`],
+    umbral:[`Umbral. Esto es duro pero sostenible. ${c} pedaladas, resistencia media alta. Concéntrate en respirar.`,`Bloque de umbral. Vas a sentir el esfuerzo. Mantén ${c} y no aflojes.`],
+    sprint:[`¡Sprint! Ritmo alto, ${c} pedaladas, con carga, que la pierna no rebote. ¡Todo lo que tengas!`,`¡A sprintar! Aprieta el ritmo a ${c}. Es cortito, ¡dale con todo!`],
+    recuperacion:[`Recuperamos. Baja la resistencia, ritmo suave, toma agua. Te lo ganaste.`,`Descanso activo. Suelta la perilla, pedalea liviano y recupera el aire.`],
+    calma:[`Última canción. Bajamos todo, pedaleo suave, y vamos estirando. Excelente trabajo.`,`Vuelta a la calma. Resistencia mínima, respira lento. Lo hiciste muy bien.`]};
+  return pick(T[k]||[`${p.b.name}. Cadencia ${c}.`]);}
+function announce(i){const p=plan[i];if(!p)return;say((i===0?pick(["¡Hola! ","¡Vamos que partimos! ",""]):"")+intro(p));}
+const MID=["¡Vas muy bien! Mantén ese ritmo.","¡Eso! Hombros relajados, respira.","¡Bien! Sigue así, no aflojes.","Mira cómo vas, ¡excelente trabajo!","¡Vamos, que se puede!"];
+let cues={};
+function coach(i,inBlk){const p=plan[i];if(!p||!voiceOn)return;const key=k=>i+":"+k;
+  if(p.dur>90&&inBlk>p.dur*0.5&&inBlk<p.dur*0.5+3&&!cues[key("mid")]){cues[key("mid")]=1;
+    say(p.b.rest?pick(["Aprovecha de tomar agua.","Respira profundo, suelta las piernas."]):pick(MID)+` ${p.cad} pedaladas.`);}
+  const nx=plan[i+1];
+  if(nx&&p.dur-inBlk<16&&p.dur-inBlk>12&&!cues[key("next")]){cues[key("next")]=1;
+    const up=nx.b.zone>p.b.zone+0.3,down=nx.b.zone<p.b.zone-0.3;
+    say(`Prepárate: viene ${nx.b.name.toLowerCase()}. `+(up?"Vamos a subir la resistencia.":down?"Ya viene el descanso.":"Mantén la energía."));}
+  if(!nx&&p.dur-inBlk<10&&!cues[key("end")]){cues[key("end")]=1;say("Últimos segundos. ¡Gracias por pedalear conmigo!");}
+}
 function locate(t){let acc=0;for(let i=0;i<plan.length;i++){if(t<acc+plan[i].dur)return{i,inBlk:t-acc,start:acc};acc+=plan[i].dur;}return{i:plan.length-1,inBlk:plan[plan.length-1].dur,start:acc-plan[plan.length-1].dur};}
 function setPanels(i,inBlk){
   const p=plan[i]; if(!p) return;
@@ -511,7 +555,7 @@ function tick(now){
   if(mode==="timer")elapsed+=dt;else if(mode==="youtube")elapsed=ytElapsed();else elapsed=syncedElapsed();
   const tot=plan.reduce((a,q)=>a+q.dur,0);if(elapsed>=tot){playing=false;elapsed=tot;}
   const L=locate(elapsed);sel=L.i;setPanels(L.i,L.inBlk);drawChart();
-  if(L.i!==lastSpoken){lastSpoken=L.i;announce(L.i);}
+  if(L.i!==lastSpoken){lastSpoken=L.i;announce(L.i);}else coach(L.i,L.inBlk);
   if(!playing&&mode==="timer"){say("Clase terminada. ¡Bien hecho!");}
   // pulso de cadencia
   const per=60/plan[L.i].cad;beatT+=dt;if(beatT>=per){beatT-=per;beat();}
@@ -520,7 +564,7 @@ function tick(now){
 function beat(){const el=$("pulse");el.classList.add("on");setTimeout(()=>el.classList.remove("on"),90);
   if(clickOn&&actx){try{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=1000;g.gain.setValueAtTime(.25,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.06);o.connect(g).connect(actx.destination);o.start();o.stop(actx.currentTime+.07);}catch(e){}}}
 $("btnPlay").onclick=()=>{unlockAudio();if(!plan.length){build(true);if(!plan.length)return;}lastSpoken=-1;
-  pickMode();enterClass();
+  pickMode();enterClass();cues={};
   if(plan.some(p=>!p.yt)&&songs.some(s=>!s.yt&&s.ytState!=="error")){ensureYt();}
   if(mode==="youtube"){
     if(!ytReady){$("modeMsg").innerHTML="🎬 Cargando el reproductor… toca Iniciar de nuevo en un segundo.";return;}
