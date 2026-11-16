@@ -58,6 +58,18 @@ button.sel{outline:3px solid var(--acc);background:#3a2615}
 .tap{font-size:20px;padding:20px;width:100%}
 .hidden{display:none}
 .big{font-size:30px;font-weight:800}
+#spVis{position:relative;overflow:hidden;border-radius:12px;min-height:320px;margin-top:8px;background:#000}
+#spBg{position:absolute;inset:-40px;background-size:cover;background-position:center;filter:blur(40px) brightness(.45) saturate(1.4)}
+.spInner{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:24px;text-align:center;gap:10px;box-sizing:border-box}
+.spRing{width:min(42vh,38vw,340px);aspect-ratio:1;border-radius:16px;animation:beat .7s ease-out infinite;overflow:hidden}
+.spRing img{width:100%;height:100%;object-fit:cover;display:block}
+@keyframes beat{0%{transform:scale(1.035);box-shadow:0 0 0 0 rgba(255,122,26,.55)}70%{transform:scale(1);box-shadow:0 0 0 22px rgba(255,122,26,0)}100%{transform:scale(1)}}
+.spT{font-size:clamp(20px,2.6vw,38px);font-weight:800}.spA{font-size:clamp(15px,1.7vw,24px);color:#ddd}
+.spBar{width:min(80%,520px);height:8px;background:rgba(255,255,255,.2);border-radius:8px;overflow:hidden}#spProg{height:100%;width:0;background:#1db954}
+.spB{font-size:clamp(16px,2vw,28px);font-weight:700;color:var(--acc)}.spN{font-size:clamp(13px,1.3vw,18px);color:#bbb}
+body.classmode #spVis{position:fixed!important;right:0;top:0;width:50vw;height:100vh;margin:0!important;border-radius:0!important;z-index:60;display:block!important}
+@media (max-aspect-ratio:1/1){body.classmode #spVis{width:100vw;height:38vh}body.classmode .spRing{width:22vh}}
+body.classmode #ytWrap.hidden,body.classmode #spVis.hidden{display:none!important}
 .cm-only{display:none}
 body.classmode{overflow:hidden}
 body.classmode .cm-only{display:flex}
@@ -186,6 +198,11 @@ body.classmode.novideo #live{width:100vw}
   <div id="modeMsg" class="hint"></div>
   <div id="tapPlay" class="warn hidden">👆 Si no parte la música, toca ▶ sobre el video o el reproductor (el celular a veces lo exige).</div>
   </div>
+  <div id="spVis" class="hidden"><div id="spBg"></div>
+    <div class="spInner"><div class="spRing" id="spRing"><img id="spArt" alt=""></div>
+      <div id="spTitle" class="spT"></div><div id="spArtist" class="spA"></div>
+      <div class="spBar"><div id="spProg"></div></div>
+      <div id="spBlock" class="spB"></div><div id="spNext" class="spN"></div></div></div>
   <div id="ytWrap" class="hidden" style="margin-top:8px;border-radius:10px;overflow:hidden"><div id="yt"></div></div>
   <div id="embedWrap" style="margin-top:8px"><div id="embed"></div></div>
   <div class="hint">Sube el volumen y saca el modo silencio. Para escuchar canciones completas, inicia sesión con tu cuenta Premium en open.spotify.com en este mismo navegador; si no, Spotify solo pone 30 segundos.</div>
@@ -572,7 +589,7 @@ function setPanels(i,inBlk){
 }
 function tick(now){
   if(!playing)return;const dt=(now-last)/1000;last=now;
-  if(mode==="timer")elapsed+=dt;else if(mode==="youtube")elapsed=ytElapsed();else if(mode==="sp")elapsed=spElapsed();else elapsed=syncedElapsed();
+  if(mode==="timer")elapsed+=dt;else if(mode==="youtube")elapsed=ytElapsed();else if(mode==="sp"){elapsed=spElapsed();spVisUpdate();}else elapsed=syncedElapsed();
   const tot=plan.reduce((a,q)=>a+q.dur,0);if(elapsed>=tot){playing=false;elapsed=tot;}
   const L=locate(elapsed);sel=L.i;setPanels(L.i,L.inBlk);drawChart();
   if(L.i!==lastSpoken){lastSpoken=L.i;announce(L.i);}else coach(L.i,L.inBlk);
@@ -600,7 +617,7 @@ $("btnPlay").onclick=()=>{unlockAudio();if(!plan.length){build(true);if(!plan.le
     else{elapsed=0;cur=0;lastDur=0;lastPos=0;
       if(mode==="track")startTrack(0);else{loadIntoPlayer(plUri());setTimeout(requestPlay,600);}}
     requestAnimationFrame(tick);return;}const tot=plan.reduce((a,q)=>a+q.dur,0);if(elapsed>=tot)elapsed=0;playing=true;last=performance.now();requestAnimationFrame(tick);};
-function enterClass(){document.body.classList.add("classmode");document.body.classList.toggle("novideo",mode!=="youtube");
+function enterClass(){document.body.classList.add("classmode");document.body.classList.toggle("novideo",mode!=="youtube"&&mode!=="sp");
   try{const el=document.documentElement;(el.requestFullscreen||el.webkitRequestFullscreen).call(el).catch(()=>{});}catch(e){}
   setTimeout(drawChart,150);}
 function exitClass(){document.body.classList.remove("classmode","novideo");
@@ -689,7 +706,7 @@ $("results").addEventListener("click",e=>{const b=e.target.closest("button");if(
   if(b.dataset.r==="pv"){playPreview(x.previewUrl,b);return;}
   if(b.dataset.r==="add"){
     if(songs.some(s=>s.id===x.trackId)){b.textContent="✓";return;}
-    const s={id:x.trackId,name:`${x.artistName} - ${x.trackName}`,dur:Math.round((x.trackTimeMillis||240000)/1000),bpm:null,art:x.artworkUrl100,preview:x.previewUrl,bpmAuto:false,bpmState:"calc",artist:x.artistName,title:x.trackName,uri:x.uri};
+    const s={id:x.trackId,name:`${x.artistName} - ${x.trackName}`,dur:Math.round((x.trackTimeMillis||240000)/1000),bpm:null,art:x.artworkUrl100,preview:x.previewUrl,bpmAuto:false,bpmState:"calc",artist:x.artistName,title:x.trackName,uri:x.uri,artL:x.artL};
     songs.push(s);plan=[];renderSongs();save();b.textContent="✓";b.disabled=true;
     $("notes").innerHTML='<div class="ok">'+songs.length+' canciones en tu lista.</div>';
     autoBpm(s);
@@ -826,15 +843,15 @@ const _itunes=itunes;
 itunes=async function(term){if(!spLogged())return _itunes(term);
   const d=await spApi("/search?type=track&limit=10&q="+encodeURIComponent(term));
   return {results:(d.tracks&&d.tracks.items||[]).map(t=>({kind:"song",trackId:t.id,trackName:t.name,artistName:t.artists.map(a=>a.name).join(", "),trackTimeMillis:t.duration_ms,
-    artworkUrl100:(t.album.images.slice(-1)[0]||{}).url,previewUrl:null,uri:t.uri}))};};
+    artworkUrl100:(t.album.images.slice(-1)[0]||{}).url,artL:(t.album.images[0]||{}).url,previewUrl:null,uri:t.uri}))};};
 findYt=async function(){};ensureYt=async function(){};
 // Canciones antiguas sin enlace de Spotify: se buscan solas
 let spEnsuring=false;
 async function spEnsure(){if(!spLogged()||spEnsuring)return;spEnsuring=true;
   for(const s of songs){if(s.uri)continue;
     try{const q=s.name.replace(/\s+-\s+/," ");const d=await spApi("/search?type=track&limit=1&q="+encodeURIComponent(q));const t=d.tracks&&d.tracks.items[0];
-      if(t){s.uri=t.uri;if(!s.art)s.art=(t.album.images.slice(-1)[0]||{}).url;}}catch(e){break;}}
-  plan.forEach(p=>{const m=songs.find(x=>x.name===p.name);if(m&&m.uri)p.uri=m.uri;});
+      if(t){s.uri=t.uri;if(!s.art)s.art=(t.album.images.slice(-1)[0]||{}).url;s.artL=(t.album.images[0]||{}).url;}}catch(e){break;}}
+  plan.forEach(p=>{const m=songs.find(x=>x.name===p.name);if(m&&m.uri){p.uri=m.uri;p.artL=m.artL;}});
   spEnsuring=false;renderSongs();save();pickMode();}
 // Playlists
 $("btnSpPl").onclick=async()=>{const box=$("spPlList");box.innerHTML='<div class="hint">Cargando tus playlists…</div>';
@@ -849,7 +866,7 @@ $("spPlList").addEventListener("click",async e=>{const b=e.target.closest("butto
     try{const d=await spApi(url);items=d.items||[];}catch(err){const d=await spApi("/playlists/"+b.dataset.pl+"/tracks?limit=100");items=d.items||[];}
     const tr=items.map(it=>it.item||it.track).filter(t=>t&&t.uri&&t.type!=="episode");
     songs=tr.map(t=>({id:t.id,name:`${t.artists.map(a=>a.name).join(", ")} - ${t.name}`,dur:Math.round(t.duration_ms/1000),bpm:null,art:(t.album&&t.album.images.slice(-1)[0]||{}).url,
-      uri:t.uri,artist:t.artists[0]&&t.artists[0].name,title:t.name,bpmAuto:false,bpmState:"calc"}));
+      uri:t.uri,artL:(t.album&&t.album.images[0]||{}).url,artist:t.artists[0]&&t.artists[0].name,title:t.name,bpmAuto:false,bpmState:"calc"}));
     plan=[];renderSongs();save();$("spPlList").innerHTML=`<div class="ok">✅ ${songs.length} canciones cargadas. Revisa los BPM y toca "Ordenar canciones".</div>`;
     for(const s of songs)await autoBpm(s);
   }catch(err){b.textContent="Error";}});
@@ -873,9 +890,9 @@ function spMakePlayer(){if(!spSdkReady||!spLogged()||spPlayer)return;
 // Reproducción
 const _pick=pickMode;
 pickMode=function(){if(spLogged()&&plan.length&&plan.every(p=>p.uri)){mode="sp";
-    try{$("ytWrap").classList.add("hidden");$("embedWrap").classList.add("hidden");}catch(e){}
+    try{$("ytWrap").classList.add("hidden");$("embedWrap").classList.add("hidden");$("spVis").classList.remove("hidden");spVisUpdate(true);}catch(e){}
     $("modeMsg").innerHTML="🟢 Música de Spotify sin anuncios. Elige arriba dónde suena.";return mode;}
-  const m=_pick();if(spLogged()&&plan.length&&plan.some(p=>!p.uri))$("modeMsg").innerHTML="🟢 Buscando las canciones en Spotify…";return m;};
+  try{$("spVis").classList.add("hidden");}catch(e){}const m=_pick();if(spLogged()&&plan.length&&plan.some(p=>!p.uri))$("modeMsg").innerHTML="🟢 Buscando las canciones en Spotify…";return m;};
 async function spPlayFrom(i){cur=i;sel=i;spPos=0;spTs=performance.now();spPaused=false;spPlayedSome=false;
   try{spPlayer&&spPlayer.activateElement&&spPlayer.activateElement();}catch(e){}
   let dev=$("spDev").value||spWebDev||"";
@@ -895,6 +912,13 @@ async function spTick(){if(!playing||mode!=="sp")return;
     spPos=d.progress_ms||0;spTs=performance.now();spPaused=!d.is_playing;if(spPos>4000)spPlayedSome=true;
     if(cur===plan.length-1&&spPaused&&spPlayedSome&&spPos<2000){playing=false;say("Clase terminada. ¡Bien hecho!");}
   }catch(e){}}
+let spVisIdx=-1;
+function spVisUpdate(force){const p=plan[cur];if(!p||!p.b)return;
+  if(force||spVisIdx!==cur){spVisIdx=cur;const img=p.artL||p.art||"";$("spArt").src=img;$("spArt").style.visibility=img?"visible":"hidden";$("spBg").style.backgroundImage=img?`url("${img}")`:"none";
+    const parts=p.name.split(" - ");$("spTitle").textContent=p.title||parts.slice(1).join(" - ")||p.name;$("spArtist").textContent=p.artist||parts[0]||"";
+    $("spBlock").textContent=`${p.b.name} · ${p.cad} rpm · ${p.b.pos}`;const nx=plan[cur+1];$("spNext").textContent=nx?`Siguiente: ${nx.b.name} — ${nx.title||nx.name}`:"Última canción";
+    $("spRing").style.animationDuration=(60/(p.cad||80)).toFixed(3)+"s";}
+  const inBlk=Math.max(0,elapsed-blockStart(cur));$("spProg").style.width=Math.min(100,inBlk/p.dur*100)+"%";}
 function spElapsed(){const p=spPos+(spPaused?0:performance.now()-spTs);return blockStart(cur)+Math.min(p/1000,plan[cur].dur-0.05);}
 function spPlayHandler(){const resume=playing===false&&elapsed>0&&elapsed<blockStart(plan.length);playing=true;last=performance.now();
   if(resume){spApi("/me/player/play"+($("spDev").value?"?device_id="+$("spDev").value:""),{method:"PUT"}).catch(()=>{});spPaused=false;spTs=performance.now();}
