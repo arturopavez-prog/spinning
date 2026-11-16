@@ -376,6 +376,7 @@ function targetCurve(n){
     else v=1.6+0.4*Math.sin(Math.PI*u);
     if(level==="principiante")v=Math.min(3,1.3+(v-1)*0.55);
     if(level==="avanzado")v=Math.min(5,v+0.3);
+    if(goal!=="hiit"&&goal!=="gluteo"){const ramp=(level==="principiante"?1.9:2.1)+k*(level==="principiante"?0.45:0.6);v=Math.min(v,ramp);}
     t.push(v);}
   if(n>1)t.push(1);
   return {t:t.slice(0,n),warm};

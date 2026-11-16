@@ -414,6 +414,7 @@ function targetCurve(n){
     else v=1.6+0.4*Math.sin(Math.PI*u);
     if(level==="principiante")v=Math.min(3,1.3+(v-1)*0.55);
     if(level==="avanzado")v=Math.min(5,v+0.3);
+    if(goal!=="hiit"&&goal!=="gluteo"){const ramp=(level==="principiante"?1.9:2.1)+k*(level==="principiante"?0.45:0.6);v=Math.min(v,ramp);}
     t.push(v);}
   if(n>1)t.push(1);
   return {t:t.slice(0,n),warm};
@@ -955,6 +956,7 @@ async function spPlayFrom(i){cur=i;sel=i;spPos=0;spTs=performance.now();spPaused
   if(!spPoll)spPoll=setInterval(spTick,1000);}
 async function spVol(v){try{await spApi("/me/player/volume?volume_percent="+v+($("spDev").value?"&device_id="+$("spDev").value:""),{method:"PUT"});}catch(e){}
   try{if(spPlayer&&$("spDev").value===spWebDev)spPlayer.setVolume(v/100);}catch(e){}}
+function spFinish(){if(!playing)return;playing=false;spApi("/me/player/pause",{method:"PUT"}).catch(()=>{});spStat("clase terminada ✔");say("Clase terminada. ¡Bien hecho! Ahora, a estirar.");classEnded();}
 let spLastResume=0;
 async function spTick(){if(!playing||mode!=="sp")return;
   try{const d=await spApi("/me/player/currently-playing");if(!d||!d.item)return;
@@ -962,7 +964,8 @@ async function spTick(){if(!playing||mode!=="sp")return;
     if(k>=0&&k!==cur){cur=k;}
     if(k>=0){const du=d.item.duration_ms/1000;if(Math.abs(plan[cur].dur-du)>1){plan[cur].dur=du;renderPlan();}}
     spPos=d.progress_ms||0;spTs=performance.now();spPaused=!d.is_playing;if(spPos>4000)spPlayedSome=true;
-    if(cur===plan.length-1&&spPaused&&spPlayedSome&&spPos<2000){playing=false;say("Clase terminada. ¡Bien hecho! Ahora, a estirar.");classEnded();return;}
+    const last=cur===plan.length-1;
+    if(last&&(k<0||(spPaused&&spPlayedSome&&spPos<2000)||(spPos/1000>=plan[cur].dur-1.5))){spFinish();return;}
     if(spPaused&&playing&&Date.now()-spLastResume>4000){spLastResume=Date.now();spStat("Spotify se pausó solo (por ejemplo al conectar la tele); retomando…");
       try{await spApi("/me/player/play",{method:"PUT"});}catch(e){}}
   }catch(e){}}
