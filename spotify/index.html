@@ -809,7 +809,7 @@ function importFromHash(){const m=location.hash.match(/^#clase=(.+)$/);if(!m)ret
 const SP_ID="b4e55c1628b245fb92c8079075b61dc4";
 const SP_REDIRECT=location.origin+location.pathname;
 const SP_SCOPES="streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative";
-let spSdkReady=false;function spStat(t){try{$("spStat").textContent="Estado: "+t;}catch(e){}}
+let spSdkReady=false;function spStat(t){try{$("spStat").textContent="Estado: "+t;$("modeMsg").innerHTML='<b style="color:#9fe0b2">Spotify: '+esc(t)+'</b>';}catch(e){}}
 let spTok=null,spPlayer=null,spWebDev=null,spPoll=null,spPos=0,spTs=0,spPaused=true,spPlayedSome=false;
 try{spTok=JSON.parse(localStorage.getItem("spin_sp")||"null")}catch(e){}
 function spSave(){try{localStorage.setItem("spin_sp",JSON.stringify(spTok))}catch(e){}}
@@ -896,6 +896,7 @@ pickMode=function(){if(spLogged()&&plan.length&&plan.every(p=>p.uri)){mode="sp";
 async function spPlayFrom(i){cur=i;sel=i;spPos=0;spTs=performance.now();spPaused=false;spPlayedSome=false;
   try{spPlayer&&spPlayer.activateElement&&spPlayer.activateElement();}catch(e){}
   let dev=$("spDev").value||spWebDev||"";
+  spStat("buscando dónde sonar…");if(!dev){await spDevices();dev=$("spDev").value||spWebDev||"";}
   if(!dev){spStat("no hay dónde reproducir: espera unos segundos a que aparezca 'Este navegador' o abre Spotify en el celular, y toca 🔄");return;}
   spStat("enviando la música…");
   try{await spApi("/me/player",{method:"PUT",body:JSON.stringify({device_ids:[dev],play:false})});}catch(e){}
