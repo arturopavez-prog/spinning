@@ -58,6 +58,9 @@ button.sel{outline:3px solid var(--acc);background:#3a2615}
 .tap{font-size:20px;padding:20px;width:100%}
 .hidden{display:none}
 .big{font-size:30px;font-weight:800}
+#live{position:relative}
+#chartTip{position:absolute;z-index:70;pointer-events:none;background:rgba(0,0,0,.88);color:#fff;border:1px solid var(--acc);border-radius:10px;padding:8px 12px;font-size:14px;max-width:260px;transform:translate(-50%,0);box-shadow:0 4px 16px rgba(0,0,0,.5)}
+#chartTip b{font-size:15px}
 .cm-only{display:none}
 body.classmode{overflow:hidden}
 body.classmode .cm-only{display:flex}
@@ -139,7 +142,7 @@ body.classmode.novideo #live{width:100vw}
   <div id="live">
   <div class="row cm-only" style="justify-content:space-between;align-items:center;margin-bottom:6px">
     <b id="cmTitle" style="font-size:18px">Clase en curso</b><button id="btnExit">✕ Salir</button></div>
-  <canvas id="chart"></canvas>
+  <canvas id="chart"></canvas><div id="chartTip" class="hidden"></div>
   <div class="legend">
     <span><i style="background:var(--z1)"></i>Z1 Recuperación</span>
     <span><i style="background:var(--z2)"></i>Z2 Base</span>
@@ -497,7 +500,17 @@ function drawChart(){
     bars.forEach((b,k)=>{const y=H-14-(plan[k].target/5)*(H-24),xm=b.x+b.w/2;k?cx.lineTo(xm,y):cx.moveTo(xm,y);});cx.stroke();cx.restore();}
   if(playing||elapsed>0){const px=pad+Math.min(1,elapsed/tot)*gw;cx.strokeStyle="#fff";cx.lineWidth=2;cx.beginPath();cx.moveTo(px,0);cx.lineTo(px,H-14);cx.stroke();cx.lineWidth=1;}
 }
-cv.addEventListener("click",e=>{const r=cv.getBoundingClientRect(),x=e.clientX-r.left;const b=bars.find(b=>x>=b.x&&x<=b.x+b.w+3);if(!b)return;sel=b.i;
+let tipTimer=null;
+function showTip(i,clientX){const p=plan[i],b=bars.find(x=>x.i===i);if(!p||!b)return;
+  const parts=p.name.split(" - ");const title=p.title||parts.slice(1).join(" - ")||p.name,artist=p.artist||parts[0]||"";
+  const t=$("chartTip");t.innerHTML=`<b>${i+1}. ${esc(title)}</b><br>${esc(artist)}<br><span style="color:var(--acc)">${p.b.name} · ${p.cad} rpm · ${fmt(p.dur)}</span>`;
+  const cr=cv.getBoundingClientRect(),lr=$("live").getBoundingClientRect();
+  let x=cr.left-lr.left+b.x+b.w/2;x=Math.max(130,Math.min(lr.width-130,x));
+  t.style.left=x+"px";t.style.top=(cr.top-lr.top+6)+"px";
+  t.classList.remove("hidden");clearTimeout(tipTimer);tipTimer=setTimeout(()=>t.classList.add("hidden"),4000);}
+cv.addEventListener("mousemove",e=>{const r=cv.getBoundingClientRect(),x=e.clientX-r.left;const b=bars.find(b=>x>=b.x&&x<=b.x+b.w+3);if(b)showTip(b.i);});
+cv.addEventListener("mouseleave",()=>$("chartTip").classList.add("hidden"));
+cv.addEventListener("click",e=>{const r=cv.getBoundingClientRect(),x=e.clientX-r.left;const b=bars.find(b=>x>=b.x&&x<=b.x+b.w+3);if(!b)return;sel=b.i;showTip(b.i);
   const start=plan.slice(0,b.i).reduce((a,p)=>a+p.dur,0);if(!playing){elapsed=start;}setPanels(b.i,elapsed-start);drawChart();});
 window.addEventListener("resize",drawChart);
 
