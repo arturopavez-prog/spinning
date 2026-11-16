@@ -99,6 +99,7 @@ body.classmode.novideo #live{width:100vw}
       <div class="hint" style="margin-top:8px">🔊 ¿Dónde suena la música?</div>
       <div class="row"><select id="spDev" style="flex:1;min-width:200px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px"></select><button id="btnSpDev">🔄</button></div>
       <div class="hint" id="spDevHint">En el computador suena aquí mismo. En el celular, abre la app de Spotify una vez y toca 🔄. Tu Chromecast también aparece en la lista si Spotify lo ve.</div>
+      <div id="spStat" class="hint" style="color:#9fe0b2"></div>
     </div>
   </div>
   <h2><span class="n">1</span>Busca tus canciones</h2>
@@ -791,6 +792,7 @@ function importFromHash(){const m=location.hash.match(/^#clase=(.+)$/);if(!m)ret
 const SP_ID="b4e55c1628b245fb92c8079075b61dc4";
 const SP_REDIRECT=location.origin+location.pathname;
 const SP_SCOPES="streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative";
+let spSdkReady=false;function spStat(t){try{$("spStat").textContent="Estado: "+t;}catch(e){}}
 let spTok=null,spPlayer=null,spWebDev=null,spPoll=null,spPos=0,spTs=0,spPaused=true,spPlayedSome=false;
 try{spTok=JSON.parse(localStorage.getItem("spin_sp")||"null")}catch(e){}
 function spSave(){try{localStorage.setItem("spin_sp",JSON.stringify(spTok))}catch(e){}}
@@ -813,7 +815,7 @@ async function spInit(){
   if(q.get("error"))history.replaceState(null,"",location.pathname);
   if(!spTok){$("spOut").classList.remove("hidden");$("spIn").classList.add("hidden");return;}
   try{const me=await spApi("/me");$("spUser").textContent=(me.display_name||me.id)+(me.product==="premium"?" · Premium":" · ⚠️ sin Premium: no podrá sonar");
-    $("spOut").classList.add("hidden");$("spIn").classList.remove("hidden");spDevices();spEnsure();}
+    $("spOut").classList.add("hidden");$("spIn").classList.remove("hidden");spMakePlayer();spDevices();spEnsure();}
   catch(e){if(e&&e.status===403){alertTop("Tu cuenta aún no está autorizada en la app de Spotify. Pídele a Arturo que te agregue.");}spTok=null;spSave();$("spOut").classList.remove("hidden");}
 }
 function alertTop(t){$("spBox").insertAdjacentHTML("afterbegin",`<div class="warn">${t}</div>`);}
@@ -856,10 +858,18 @@ async function spDevices(){try{const d=await spApi("/me/player/devices");const s
   const list=(d.devices||[]);sel.innerHTML=list.length?list.map(x=>`<option value="${x.id}">${x.id===spWebDev?"💻 Este navegador":(x.type==="Smartphone"?"📱 ":x.type==="CastVideo"||x.type==="TV"||x.type==="CastAudio"?"📺 ":"🔈 ")+esc(x.name)}${x.is_active?" (activo)":""}</option>`).join(""):'<option value="">No veo dispositivos: abre Spotify en tu celular y toca 🔄</option>';
   if(prev&&list.some(x=>x.id===prev))sel.value=prev;else{const a=list.find(x=>x.id===spWebDev)||list.find(x=>x.is_active);if(a)sel.value=a.id;}}catch(e){}}
 $("btnSpDev").onclick=spDevices;
-window.onSpotifyWebPlaybackSDKReady=()=>{if(!spLogged())return;
+window.onSpotifyWebPlaybackSDKReady=()=>{spSdkReady=true;spMakePlayer();};
+function spMakePlayer(){if(!spSdkReady||!spLogged()||spPlayer)return;
   spPlayer=new Spotify.Player({name:"Spinning (navegador)",getOAuthToken:cb=>{spToken().then(cb).catch(()=>{})},volume:1});
-  spPlayer.addListener("ready",({device_id})=>{spWebDev=device_id;spDevices();});
-  spPlayer.addListener("account_error",()=>{});spPlayer.connect();};
+  spPlayer.addListener("ready",({device_id})=>{spWebDev=device_id;spStat("reproductor del navegador listo ✔");spDevices();});
+  spPlayer.addListener("not_ready",()=>spStat("el reproductor del navegador se desconectó"));
+  spPlayer.addListener("initialization_error",e=>spStat("este navegador no puede reproducir Spotify ("+e.message+")"));
+  spPlayer.addListener("authentication_error",e=>spStat("problema de permisos: toca Salir y vuelve a entrar ("+e.message+")"));
+  spPlayer.addListener("account_error",e=>spStat("la cuenta necesita Premium ("+e.message+")"));
+  spPlayer.addListener("playback_error",e=>spStat("error al reproducir ("+e.message+")"));
+  spPlayer.addListener("player_state_changed",st=>{if(!st)return;spPos=st.position;spTs=performance.now();spPaused=st.paused;if(st.position>4000)spPlayedSome=true;
+    const u=st.track_window&&st.track_window.current_track&&st.track_window.current_track.uri;const k=plan.findIndex(p=>p.uri===u);if(k>=0)cur=k;});
+  spPlayer.connect().then(ok=>{if(!ok)spStat("no pude iniciar el reproductor del navegador");});}
 // Reproducción
 const _pick=pickMode;
 pickMode=function(){if(spLogged()&&plan.length&&plan.every(p=>p.uri)){mode="sp";
@@ -867,9 +877,15 @@ pickMode=function(){if(spLogged()&&plan.length&&plan.every(p=>p.uri)){mode="sp";
     $("modeMsg").innerHTML="🟢 Música de Spotify sin anuncios. Elige arriba dónde suena.";return mode;}
   const m=_pick();if(spLogged()&&plan.length&&plan.some(p=>!p.uri))$("modeMsg").innerHTML="🟢 Buscando las canciones en Spotify…";return m;};
 async function spPlayFrom(i){cur=i;sel=i;spPos=0;spTs=performance.now();spPaused=false;spPlayedSome=false;
-  const dev=$("spDev").value;try{spPlayer&&spPlayer.activateElement&&spPlayer.activateElement();}catch(e){}
-  try{await spApi("/me/player/play"+(dev?"?device_id="+dev:""),{method:"PUT",body:JSON.stringify({uris:plan.map(p=>p.uri),offset:{position:i},position_ms:0})});}
-  catch(e){$("modeMsg").innerHTML="⚠️ Spotify no respondió en ese dispositivo"+(e&&e.message?" ("+esc(e.message)+")":"")+". Abre Spotify en el celular o elige otro dispositivo y toca 🔄.";}
+  try{spPlayer&&spPlayer.activateElement&&spPlayer.activateElement();}catch(e){}
+  let dev=$("spDev").value||spWebDev||"";
+  if(!dev){spStat("no hay dónde reproducir: espera unos segundos a que aparezca 'Este navegador' o abre Spotify en el celular, y toca 🔄");return;}
+  spStat("enviando la música…");
+  try{await spApi("/me/player",{method:"PUT",body:JSON.stringify({device_ids:[dev],play:false})});}catch(e){}
+  await new Promise(r=>setTimeout(r,400));
+  try{await spApi("/me/player/play?device_id="+dev,{method:"PUT",body:JSON.stringify({uris:plan.map(p=>p.uri),offset:{position:i},position_ms:0})});spStat("sonando ✔");}
+  catch(e){spStat("Spotify no aceptó reproducir"+(e&&e.message?": "+e.message:"")+(e&&e.status?" (código "+e.status+")":"")+". Mándale una captura de esto a Claude.");}
+  setTimeout(()=>{if(playing&&mode==="sp"&&!spPlayedSome&&spPos<1500)spStat("la música no avanza. Revisa el volumen y que el dispositivo elegido esté encendido; si sigue igual, mándale una captura a Claude.");},8000);
   if(!spPoll)spPoll=setInterval(spTick,1000);}
 async function spTick(){if(!playing||mode!=="sp")return;
   try{const d=await spApi("/me/player/currently-playing");if(!d||!d.item)return;
