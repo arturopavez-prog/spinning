@@ -58,7 +58,6 @@ button.sel{outline:3px solid var(--acc);background:#3a2615}
 .tap{font-size:20px;padding:20px;width:100%}
 .hidden{display:none}
 .big{font-size:30px;font-weight:800}
-#tvOverlay:not(.hidden){display:flex}
 .cm-only{display:none}
 body.classmode{overflow:hidden}
 body.classmode .cm-only{display:flex}
@@ -137,14 +136,6 @@ body.classmode.novideo #live{width:100vw}
   <h2><span class="n">4</span>Tu clase</h2>
   <div class="row"><button class="pri" id="btnBuild">Ordenar canciones</button><button id="btnKeep">Usar mi orden</button></div>
   <div id="notes" style="margin-top:8px"></div>
-  <div class="row" style="margin:8px 0"><button id="btnTv">📺 Ver en la tele (control desde el celular)</button></div>
-  <div id="tvBox" class="hidden" style="background:var(--card2);border-radius:12px;padding:12px;margin-bottom:10px">
-    <div class="hint" style="color:var(--txt)"><b>1.</b> En el navegador de la tele abre: <b>arturopavez-prog.github.io/spinning/?tv</b> (guárdala en favoritos).<br>
-    <b>2.</b> En la tele aparece un número de 4 dígitos. Escríbelo aquí:</div>
-    <div class="row" style="margin-top:8px"><input id="tvCode" inputmode="numeric" maxlength="4" placeholder="0000" style="width:120px;font-size:26px;text-align:center;background:var(--bg);color:var(--txt);border:2px solid var(--acc);border-radius:10px;padding:8px">
-    <button class="pri" id="btnTvConnect">Conectar</button><button id="btnTvOff">Desconectar</button></div>
-    <div id="tvStatus" class="hint"></div>
-  </div>
   <div id="live">
   <div class="row cm-only" style="justify-content:space-between;align-items:center;margin-bottom:6px">
     <b id="cmTitle" style="font-size:18px">Clase en curso</b><button id="btnExit">✕ Salir</button></div>
@@ -211,12 +202,6 @@ body.classmode.novideo #live{width:100vw}
   </div>
 </section>
 </main>
-<div id="tvOverlay" class="hidden" style="position:fixed;inset:0;z-index:80;background:#121212;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px">
-  <div style="font-size:3vw;color:var(--mut)">En tu celular, abre la app, toca <b style="color:var(--txt)">📺 Ver en la tele</b> y escribe:</div>
-  <div id="tvCodeBig" style="font-size:16vw;font-weight:800;color:var(--acc);letter-spacing:2vw">····</div>
-  <div id="tvMsg" style="font-size:2.4vw;color:var(--mut);margin-bottom:3vw">Preparando…</div>
-  <button id="btnTvUnlock" class="pri" autofocus style="font-size:2.6vw;padding:1.5vw 4vw">🔊 Presiona OK para activar el sonido</button>
-</div>
 
 <script>
 // ---------- Datos de bloques ----------
@@ -578,7 +563,7 @@ function tick(now){
 }
 function beat(){const el=$("pulse");el.classList.add("on");setTimeout(()=>el.classList.remove("on"),90);
   if(clickOn&&actx){try{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=1000;g.gain.setValueAtTime(.25,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.06);o.connect(g).connect(actx.destination);o.start();o.stop(actx.currentTime+.07);}catch(e){}}}
-$("btnPlay").onclick=()=>{if(remoteConn){sendPlan();remoteSend({t:"play"});enterClass();return;}unlockAudio();if(!plan.length){build(true);if(!plan.length)return;}lastSpoken=-1;
+$("btnPlay").onclick=()=>{unlockAudio();if(!plan.length){build(true);if(!plan.length)return;}lastSpoken=-1;
   pickMode();enterClass();cues={};
   if(plan.some(p=>!p.yt)&&songs.some(s=>!s.yt&&s.ytState!=="error")){ensureYt();}
   if(mode==="youtube"){
@@ -594,8 +579,8 @@ $("btnPlay").onclick=()=>{if(remoteConn){sendPlan();remoteSend({t:"play"});enter
     else{elapsed=0;cur=0;lastDur=0;lastPos=0;
       if(mode==="track")startTrack(0);else{loadIntoPlayer(plUri());setTimeout(requestPlay,600);}}
     requestAnimationFrame(tick);return;}const tot=plan.reduce((a,q)=>a+q.dur,0);if(elapsed>=tot)elapsed=0;playing=true;last=performance.now();requestAnimationFrame(tick);};
-function enterClass(){document.body.classList.add("classmode");document.body.classList.toggle("novideo",mode!=="youtube"||!!remoteConn);
-  if(!remoteConn)try{const el=document.documentElement;(el.requestFullscreen||el.webkitRequestFullscreen).call(el).catch(()=>{});}catch(e){}
+function enterClass(){document.body.classList.add("classmode");document.body.classList.toggle("novideo",mode!=="youtube");
+  try{const el=document.documentElement;(el.requestFullscreen||el.webkitRequestFullscreen).call(el).catch(()=>{});}catch(e){}
   setTimeout(drawChart,150);}
 function exitClass(){document.body.classList.remove("classmode","novideo");
   try{if(document.fullscreenElement)(document.exitFullscreen||document.webkitExitFullscreen).call(document);}catch(e){}
@@ -603,8 +588,8 @@ function exitClass(){document.body.classList.remove("classmode","novideo");
 $("btnExit").onclick=()=>{$("btnPause").click();exitClass();};
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&document.body.classList.contains("classmode"))exitClass();});
 document.addEventListener("fullscreenchange",()=>setTimeout(drawChart,150));
-$("btnPause").onclick=()=>{if(remoteConn){remoteSend({t:"pause"});return;}playing=false;try{if(mode==="youtube")ytP.pauseVideo();else ctrl&&mode!=="timer"&&ctrl.pause();}catch(e){}};
-function jump(d){if(remoteConn){remoteSend({t:"jump",d});return;}if(!plan.length)return;
+$("btnPause").onclick=()=>{playing=false;try{if(mode==="youtube")ytP.pauseVideo();else ctrl&&mode!=="timer"&&ctrl.pause();}catch(e){}};
+function jump(d){if(!plan.length)return;
   if(playing&&mode==="youtube"){const j=Math.max(0,Math.min(plan.length-1,cur+d));ytStart(j);return;}
   if(playing&&mode==="track"){const j=Math.max(0,Math.min(plan.length-1,cur+d));startTrack(j);return;}
   if(playing&&mode==="playlist"){$("modeMsg").innerHTML="En modo playlist, salta con ⏭ / ⏮ del reproductor de Spotify.";return;}const L=locate(elapsed);const j=Math.max(0,Math.min(plan.length-1,L.i+d));elapsed=plan.slice(0,j).reduce((a,p)=>a+p.dur,0)+0.01;sel=j;setPanels(j,0);drawChart();lastSpoken=j;announce(j);}
@@ -760,48 +745,6 @@ function ytElapsed(){let t=0,d=0;try{t=ytP.getCurrentTime()||0;d=ytP.getDuration
   if(d>5&&Math.abs(plan[cur].dur-d)>1){plan[cur].dur=d;renderPlan();}
   return blockStart(cur)+Math.min(t,plan[cur].dur-0.05);}
 
-// ---------- Tele + control remoto (PeerJS, sin cuentas) ----------
-const IS_TV=new URLSearchParams(location.search).has("tv");
-let remoteConn=null,tvConn=null,peer=null,tvUnlocked=false;
-function remoteSend(m){try{remoteConn&&remoteConn.open&&remoteConn.send(m);}catch(e){}}
-function sendPlan(){if(!plan.length)build(false);remoteSend({t:"plan",level,goal,songs:plan.map(({b,blk,cad,fit,why,target,offBeat,bpmState,ytState,...x})=>x)});}
-function applyStatus(m){if(m.durs&&m.durs.length===plan.length)m.durs.forEach((d,i)=>plan[i].dur=d);
-  elapsed=m.elapsed||0;if(!plan.length)return;const L=locate(elapsed);sel=L.i;setPanels(L.i,L.inBlk);drawChart();}
-$("btnTv").onclick=()=>{$("tvBox").classList.toggle("hidden");if(!$("tvBox").classList.contains("hidden"))$("tvCode").focus();};
-$("btnTvConnect").onclick=()=>{const code=($("tvCode").value||"").replace(/\D/g,"");if(code.length!==4){$("tvStatus").textContent="Escribe los 4 números que muestra la tele.";return;}
-  if(typeof Peer==="undefined"){$("tvStatus").textContent="No pude cargar la conexión. Revisa tu internet.";return;}
-  $("tvStatus").textContent="Conectando…";try{peer&&peer.destroy();}catch(e){}
-  peer=new Peer();peer.on("open",()=>{const c=peer.connect("spinapp-"+code,{reliable:true});
-    const fail=setTimeout(()=>{if(!remoteConn)$("tvStatus").textContent="No encontré la tele. Revisa el número y que la tele tenga la página abierta.";},9000);
-    c.on("open",()=>{clearTimeout(fail);remoteConn=c;voiceOn=false;$("btnVoice").textContent="🗣️ Voz: en la tele";
-      $("tvStatus").innerHTML="✅ <b>Conectado a la tele.</b> Ahora Iniciar, Pausa y ⏮ ⏭ controlan la tele.";sendPlan();});
-    c.on("data",m=>{if(m&&m.t==="status")applyStatus(m);if(m&&m.t==="hello")$("tvStatus").innerHTML+=" La tele "+(m.unlocked?"tiene el sonido activado.":"<b>todavía no tiene el sonido activado: presiona OK en el control de la tele.</b>");});
-    c.on("close",()=>{remoteConn=null;voiceOn=true;$("btnVoice").textContent="🗣️ Voz del profe: sí";$("tvStatus").textContent="Se cortó la conexión con la tele.";});});
-  peer.on("error",e=>{$("tvStatus").textContent="No pude conectar ("+(e.type||"error")+"). Revisa el número.";});};
-$("btnTvOff").onclick=()=>{try{remoteConn&&remoteConn.close();peer&&peer.destroy();}catch(e){}remoteConn=null;voiceOn=true;$("tvStatus").textContent="Desconectado.";};
-function startTv(){
-  $("tvOverlay").classList.remove("hidden");document.body.style.overflow="hidden";
-  const make=()=>{const code=String(Math.floor(1000+Math.random()*9000));
-    if(typeof Peer==="undefined"){$("tvMsg").textContent="No pude cargar la conexión. Recarga la página.";return;}
-    peer=new Peer("spinapp-"+code);
-    peer.on("open",()=>{$("tvCodeBig").textContent=code;$("tvMsg").textContent="Esperando al celular…";});
-    peer.on("error",e=>{if(e.type==="unavailable-id"){try{peer.destroy()}catch(x){}make();}else $("tvMsg").textContent="Problema de conexión ("+e.type+"). Recarga la página.";});
-    peer.on("connection",c=>{tvConn=c;c.on("open",()=>{$("tvMsg").textContent="✅ Celular conectado. Esperando la clase…";c.send({t:"hello",unlocked:tvUnlocked});});
-      c.on("data",tvCmd);c.on("close",()=>{tvConn=null;$("tvOverlay").classList.remove("hidden");$("tvMsg").textContent="Se desconectó el celular. Esperando…";});});};
-  make();
-  setInterval(()=>{if(tvConn&&tvConn.open&&plan.length)try{tvConn.send({t:"status",elapsed,playing,durs:plan.map(p=>p.dur)});}catch(e){}},1000);
-}
-$("btnTvUnlock").onclick=()=>{unlockAudio();tvUnlocked=true;try{const u=new SpeechSynthesisUtterance("Sonido activado");u.lang="es-ES";if(voicePick)u.voice=voicePick;speechSynthesis.speak(u);}catch(e){}
-  $("btnTvUnlock").textContent="🔊 Sonido activado";if(tvConn)tvConn.send({t:"hello",unlocked:true});};
-function tvCmd(m){if(!m)return;
-  if(m.t==="plan"){level=m.level;goal=m.goal;songs=m.songs||[];renderLevels();renderGoals();renderSongs();build(false);
-    $("tvOverlay").classList.add("hidden");pickMode();enterClass();}
-  if(m.t==="play"){$("tvOverlay").classList.add("hidden");$("btnPlay").onclick();}
-  if(m.t==="pause")$("btnPause").onclick();
-  if(m.t==="jump")jump(m.d);
-}
-if(IS_TV)window.addEventListener("load",startTv);
-
 // ---------- Mis clases ----------
 function getSaved(){try{return JSON.parse(localStorage.getItem("spin_classes")||"[]")}catch(e){return []}}
 function setSaved(a){try{localStorage.setItem("spin_classes",JSON.stringify(a))}catch(e){$("saved").innerHTML='<div class="warn">Este navegador no deja guardar.</div>'}}
@@ -848,6 +791,5 @@ renderLevels();renderGoals();renderSongs();drawChart();pickMode();renderSaved();
 </script>
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <script src="https://www.youtube.com/iframe_api" async></script>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </body>
 </html>
