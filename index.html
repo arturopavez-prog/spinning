@@ -188,6 +188,13 @@ body.classmode.novideo #live{width:100vw}
   <input id="clsName" placeholder="Nombre de la clase (puedes dictarlo)" style="width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px">
   <div class="row" style="margin-top:8px"><button class="pri" id="btnSave">Guardar clase</button></div>
   <div id="saved" style="margin-top:10px"></div>
+  <div id="shareBox" class="hidden" style="background:#fff;color:#111;border-radius:12px;padding:14px;margin-top:10px;text-align:center">
+    <b id="shareTitle">Enviar clase</b>
+    <div style="font-size:14px;margin:6px 0">Apunta la cámara del celular a este código y toca el enlace: la clase queda guardada allá.</div>
+    <div id="qr" style="display:inline-block;margin:8px auto"></div>
+    <div class="row" style="justify-content:center"><button id="btnShareCopy" style="background:#eee;color:#111">📋 Copiar enlace (para WhatsApp)</button><button id="btnShareClose" style="background:#eee;color:#111">Cerrar</button></div>
+    <div id="shareMsg" style="font-size:13px"></div>
+  </div>
 </section>
 
 <section>
@@ -745,13 +752,35 @@ function ytElapsed(){let t=0,d=0;try{t=ytP.getCurrentTime()||0;d=ytP.getDuration
   if(d>5&&Math.abs(plan[cur].dur-d)>1){plan[cur].dur=d;renderPlan();}
   return blockStart(cur)+Math.min(t,plan[cur].dur-0.05);}
 
+// ---------- Enviar una clase a otro aparato (QR o enlace) ----------
+let shareUrl="";
+function packClass(c){const slim={n:c.name,l:c.level,g:c.goal,s:(c.songs||[]).map(x=>[x.name,x.bpm||0,Math.round(x.dur||240),x.yt||"",x.bpmAuto?1:0])};
+  return LZString.compressToEncodedURIComponent(JSON.stringify(slim));}
+function unpackClass(z){const o=JSON.parse(LZString.decompressFromEncodedURIComponent(z));
+  return {name:o.n,level:o.l,goal:o.g,n:o.s.length,songs:o.s.map(a=>({name:a[0],bpm:a[1]||null,dur:a[2],yt:a[3]||undefined,bpmAuto:!!a[4]})),txt:"",pl:""};}
+function shareClass(c){if(typeof LZString==="undefined"||typeof QRCode==="undefined"){alertBox("No pude cargar el generador de códigos. Revisa tu internet.");return;}
+  if(!c.songs){alertBox("Esta clase es de una versión antigua: ábrela y vuelve a guardarla para poder enviarla.");return;}
+  shareUrl=location.origin+location.pathname+"#clase="+packClass(c);
+  $("shareTitle").textContent="Enviar: "+c.name;$("qr").innerHTML="";$("shareMsg").textContent="";
+  new QRCode($("qr"),{text:shareUrl,width:240,height:240,correctLevel:QRCode.CorrectLevel.L});
+  $("shareBox").classList.remove("hidden");$("shareBox").scrollIntoView({behavior:"smooth",block:"center"});}
+function alertBox(t){$("saved").insertAdjacentHTML("afterbegin",`<div class="warn">${t}</div>`);}
+$("btnShareClose").onclick=()=>$("shareBox").classList.add("hidden");
+$("btnShareCopy").onclick=async()=>{try{await navigator.clipboard.writeText(shareUrl);$("shareMsg").textContent="Enlace copiado ✔. Pégalo en WhatsApp y ábrelo en el otro aparato.";}catch(e){$("shareMsg").textContent=shareUrl;}};
+function importFromHash(){const m=location.hash.match(/^#clase=(.+)$/);if(!m)return;
+  try{const c=unpackClass(m[1]);const a=getSaved();a.unshift(c);setSaved(a);renderSaved();
+    history.replaceState(null,"",location.pathname);
+    $("saved").insertAdjacentHTML("afterbegin",`<div class="ok">✅ Clase "<b>${esc(c.name)}</b>" recibida y guardada en este aparato.</div>`);
+    setTimeout(()=>$("saved").scrollIntoView({behavior:"smooth",block:"center"}),300);
+  }catch(e){alertBox("No pude leer la clase recibida. Pide que te la envíen de nuevo.");}}
+
 // ---------- Mis clases ----------
 function getSaved(){try{return JSON.parse(localStorage.getItem("spin_classes")||"[]")}catch(e){return []}}
 function setSaved(a){try{localStorage.setItem("spin_classes",JSON.stringify(a))}catch(e){$("saved").innerHTML='<div class="warn">Este navegador no deja guardar.</div>'}}
 function renderSaved(){const a=getSaved();
   $("saved").innerHTML=a.length?a.map((c,i)=>`<div class="song" style="grid-template-columns:1fr auto">
     <div><div class="name">${esc(c.name)}</div><div class="meta">${LEVELS[c.level]?LEVELS[c.level].name:""} · ${GOALS[c.goal]?GOALS[c.goal].name:""} · ${c.n} canciones</div></div>
-    <div class="row"><button class="pri" data-o="${i}">▶ Abrir</button><button data-r="${i}">✏️</button><button data-d="${i}">🗑️</button></div></div>`).join(""):'<div class="hint">Todavía no guardas clases.</div>';}
+    <div class="row"><button class="pri" data-o="${i}">▶ Abrir</button><button data-s="${i}" title="Enviar a otro aparato">📲</button><button data-r="${i}">✏️</button><button data-d="${i}">🗑️</button></div></div>`).join(""):'<div class="hint">Todavía no guardas clases.</div>';}
 $("btnSave").onclick=()=>{
   if(!plan.length){$("saved").insertAdjacentHTML("afterbegin",'<div class="warn">Primero arma la clase (paso 4).</div>');return;}
   const a=getSaved();const name=($("clsName").value||"").trim()||`Clase ${a.length+1} – ${LEVELS[level].name}`;
@@ -764,6 +793,7 @@ $("saved").addEventListener("click",e=>{const b=e.target.closest("button");if(!b
     box.innerHTML=`<input value="${esc(a[i].name)}" style="flex:1;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px"><button class="pri">OK</button>`;
     b.closest(".song").after(box);box.querySelector("button").onclick=()=>{a[i].name=box.querySelector("input").value.trim()||a[i].name;setSaved(a);renderSaved();};}
   if(b.dataset.d!==undefined){a.splice(+b.dataset.d,1);setSaved(a);renderSaved();}
+  if(b.dataset.s!==undefined)shareClass(a[+b.dataset.s]);
 });
 
 // ---------- Botones principales ----------
@@ -787,9 +817,11 @@ $("btnCopy").onclick=async()=>{
 
 // ---------- Inicio ----------
 try{const t=localStorage.getItem("spin_songs");if(t){songs=JSON.parse(t)||[];}const g=localStorage.getItem("spin_goal");if(g&&GOALS[g])goal=g;const pv=localStorage.getItem("spin_pl");if(pv)$("pl").value=pv;const lv=localStorage.getItem("spin_level");if(lv&&LEVELS[lv])level=lv;}catch(e){}
-renderLevels();renderGoals();renderSongs();drawChart();pickMode();renderSaved();
+renderLevels();renderGoals();renderSongs();drawChart();pickMode();renderSaved();window.addEventListener("load",importFromHash);
 </script>
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <script src="https://www.youtube.com/iframe_api" async></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </body>
 </html>
