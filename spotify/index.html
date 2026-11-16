@@ -926,13 +926,16 @@ async function spPlayFrom(i){cur=i;sel=i;spPos=0;spTs=performance.now();spPaused
   catch(e){spStat("Spotify no aceptó reproducir"+(e&&e.message?": "+e.message:"")+(e&&e.status?" (código "+e.status+")":"")+". Mándale una captura de esto a Claude.");}
   setTimeout(()=>{if(playing&&mode==="sp"&&!spPlayedSome&&spPos<1500)spStat("la música no avanza. Revisa el volumen y que el dispositivo elegido esté encendido; si sigue igual, mándale una captura a Claude.");},8000);
   if(!spPoll)spPoll=setInterval(spTick,1000);}
+let spLastResume=0;
 async function spTick(){if(!playing||mode!=="sp")return;
   try{const d=await spApi("/me/player/currently-playing");if(!d||!d.item)return;
     const k=plan.findIndex(p=>p.uri===d.item.uri);
     if(k>=0&&k!==cur){cur=k;}
     if(k>=0){const du=d.item.duration_ms/1000;if(Math.abs(plan[cur].dur-du)>1){plan[cur].dur=du;renderPlan();}}
     spPos=d.progress_ms||0;spTs=performance.now();spPaused=!d.is_playing;if(spPos>4000)spPlayedSome=true;
-    if(cur===plan.length-1&&spPaused&&spPlayedSome&&spPos<2000){playing=false;say("Clase terminada. ¡Bien hecho!");}
+    if(cur===plan.length-1&&spPaused&&spPlayedSome&&spPos<2000){playing=false;say("Clase terminada. ¡Bien hecho!");return;}
+    if(spPaused&&playing&&Date.now()-spLastResume>4000){spLastResume=Date.now();spStat("Spotify se pausó solo (por ejemplo al conectar la tele); retomando…");
+      try{await spApi("/me/player/play",{method:"PUT"});}catch(e){}}
   }catch(e){}}
 const artistImgCache={};let slideTimer=null,slideList=[],slideK=0,slideLayer=0;
 async function artistImages(p){const fallback=[p.artL||p.art].filter(Boolean);
