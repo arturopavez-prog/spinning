@@ -118,7 +118,7 @@ body.classmode.novideo #live{width:100vw}
       <div class="row" style="margin-top:8px"><button id="btnSpPl" style="background:#1db954;color:#000;font-weight:700">📂 Importar una de mis playlists</button></div>
       <div id="spPlList" style="margin-top:8px"></div>
       <div class="hint" style="margin-top:8px">🔊 ¿Dónde suena la música?</div>
-      <div class="row"><select id="spDev" style="flex:1;min-width:200px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px"></select><button id="btnSpDev">🔄</button></div>
+      <div class="row"><select id="spDev" style="flex:1;min-width:200px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px"></select><button id="btnSpDev">🔄</button><button id="btnSpVol" title="Subir el volumen de Spotify al máximo">🔊 Máx</button></div>
       <div class="hint" id="spDevHint">En el computador suena aquí mismo. En el celular, abre la app de Spotify una vez y toca 🔄. Tu Chromecast también aparece en la lista si Spotify lo ve.</div>
       <div id="spStat" class="hint" style="color:#9fe0b2"></div>
     </div>
@@ -895,7 +895,7 @@ $("spPlList").addEventListener("click",async e=>{const b=e.target.closest("butto
 async function spDevices(){try{const d=await spApi("/me/player/devices");const sel=$("spDev");const prev=sel.value;
   const list=(d.devices||[]);sel.innerHTML=list.length?list.map(x=>`<option value="${x.id}">${x.id===spWebDev?"💻 Este navegador":(x.type==="Smartphone"?"📱 ":x.type==="CastVideo"||x.type==="TV"||x.type==="CastAudio"?"📺 ":"🔈 ")+esc(x.name)}${x.is_active?" (activo)":""}</option>`).join(""):'<option value="">No veo dispositivos: abre Spotify en tu celular y toca 🔄</option>';
   if(prev&&list.some(x=>x.id===prev))sel.value=prev;else{const a=list.find(x=>x.id===spWebDev)||list.find(x=>x.is_active);if(a)sel.value=a.id;}}catch(e){}}
-$("btnSpDev").onclick=spDevices;
+$("btnSpDev").onclick=spDevices;$("btnSpVol").onclick=()=>{spVol(100);spStat("volumen de Spotify al máximo");};
 window.onSpotifyWebPlaybackSDKReady=()=>{spSdkReady=true;spMakePlayer();};
 function spMakePlayer(){if(!spSdkReady||!spLogged()||spPlayer)return;
   spPlayer=new Spotify.Player({name:"Spinning (navegador)",getOAuthToken:cb=>{spToken().then(cb).catch(()=>{})},volume:1});
@@ -922,10 +922,12 @@ async function spPlayFrom(i){cur=i;sel=i;spPos=0;spTs=performance.now();spPaused
   spStat("enviando la música…");
   try{await spApi("/me/player",{method:"PUT",body:JSON.stringify({device_ids:[dev],play:false})});}catch(e){}
   await new Promise(r=>setTimeout(r,400));
-  try{await spApi("/me/player/play?device_id="+dev,{method:"PUT",body:JSON.stringify({uris:plan.map(p=>p.uri),offset:{position:i},position_ms:0})});spStat("sonando ✔");}
+  try{await spApi("/me/player/play?device_id="+dev,{method:"PUT",body:JSON.stringify({uris:plan.map(p=>p.uri),offset:{position:i},position_ms:0})});spStat("sonando ✔");spVol(100);}
   catch(e){spStat("Spotify no aceptó reproducir"+(e&&e.message?": "+e.message:"")+(e&&e.status?" (código "+e.status+")":"")+". Mándale una captura de esto a Claude.");}
   setTimeout(()=>{if(playing&&mode==="sp"&&!spPlayedSome&&spPos<1500)spStat("la música no avanza. Revisa el volumen y que el dispositivo elegido esté encendido; si sigue igual, mándale una captura a Claude.");},8000);
   if(!spPoll)spPoll=setInterval(spTick,1000);}
+async function spVol(v){try{await spApi("/me/player/volume?volume_percent="+v+($("spDev").value?"&device_id="+$("spDev").value:""),{method:"PUT"});}catch(e){}
+  try{if(spPlayer&&$("spDev").value===spWebDev)spPlayer.setVolume(v/100);}catch(e){}}
 let spLastResume=0;
 async function spTick(){if(!playing||mode!=="sp")return;
   try{const d=await spApi("/me/player/currently-playing");if(!d||!d.item)return;
