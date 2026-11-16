@@ -60,15 +60,21 @@ button.sel{outline:3px solid var(--acc);background:#3a2615}
 .big{font-size:30px;font-weight:800}
 #spVis{position:relative;overflow:hidden;border-radius:12px;min-height:320px;margin-top:8px;background:#000}
 #spBg{position:absolute;inset:-40px;background-size:cover;background-position:center;filter:blur(40px) brightness(.45) saturate(1.4)}
-.spInner{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:24px;text-align:center;gap:10px;box-sizing:border-box}
-.spRing{width:min(42vh,38vw,340px);aspect-ratio:1;border-radius:16px;animation:beat .7s ease-out infinite;overflow:hidden}
+.slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.4s ease}
+.slide.on{opacity:1;animation:kb 9s ease-out forwards}
+@keyframes kb{from{transform:scale(1.02)}to{transform:scale(1.14)}}
+.spShade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.05) 35%,rgba(0,0,0,.85) 100%)}
+.spInner{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;padding:24px;text-align:center;gap:10px;box-sizing:border-box}
+.spRow{display:flex;gap:16px;align-items:center;width:min(92%,640px)}
+.spCred{position:absolute;top:10px;right:14px;font-size:12px;color:#ccc;background:rgba(0,0,0,.45);padding:3px 8px;border-radius:8px}
+.spRing{width:min(16vh,120px);flex:none;aspect-ratio:1;border-radius:12px;animation:beat .7s ease-out infinite;overflow:hidden}
 .spRing img{width:100%;height:100%;object-fit:cover;display:block}
 @keyframes beat{0%{transform:scale(1.035);box-shadow:0 0 0 0 rgba(255,122,26,.55)}70%{transform:scale(1);box-shadow:0 0 0 22px rgba(255,122,26,0)}100%{transform:scale(1)}}
 .spT{font-size:clamp(20px,2.6vw,38px);font-weight:800}.spA{font-size:clamp(15px,1.7vw,24px);color:#ddd}
 .spBar{width:min(80%,520px);height:8px;background:rgba(255,255,255,.2);border-radius:8px;overflow:hidden}#spProg{height:100%;width:0;background:#1db954}
 .spB{font-size:clamp(16px,2vw,28px);font-weight:700;color:var(--acc)}.spN{font-size:clamp(13px,1.3vw,18px);color:#bbb}
 body.classmode #spVis{position:fixed!important;right:0;top:0;width:50vw;height:100vh;margin:0!important;border-radius:0!important;z-index:60;display:block!important}
-@media (max-aspect-ratio:1/1){body.classmode #spVis{width:100vw;height:38vh}body.classmode .spRing{width:22vh}}
+@media (max-aspect-ratio:1/1){body.classmode #spVis{width:100vw;height:38vh}body.classmode .spRing{width:9vh}}
 body.classmode #ytWrap.hidden,body.classmode #spVis.hidden{display:none!important}
 .cm-only{display:none}
 body.classmode{overflow:hidden}
@@ -199,10 +205,12 @@ body.classmode.novideo #live{width:100vw}
   <div id="tapPlay" class="warn hidden">👆 Si no parte la música, toca ▶ sobre el video o el reproductor (el celular a veces lo exige).</div>
   </div>
   <div id="spVis" class="hidden"><div id="spBg"></div>
-    <div class="spInner"><div class="spRing" id="spRing"><img id="spArt" alt=""></div>
-      <div id="spTitle" class="spT"></div><div id="spArtist" class="spA"></div>
+    <div class="slide" id="sl0"></div><div class="slide" id="sl1"></div><div class="spShade"></div>
+    <div class="spInner"><div class="spRow"><div class="spRing" id="spRing"><img id="spArt" alt=""></div>
+      <div style="text-align:left;min-width:0"><div id="spTitle" class="spT"></div><div id="spArtist" class="spA"></div></div></div>
       <div class="spBar"><div id="spProg"></div></div>
-      <div id="spBlock" class="spB"></div><div id="spNext" class="spN"></div></div></div>
+      <div id="spBlock" class="spB"></div><div id="spNext" class="spN"></div></div>
+    <div class="spCred">Imágenes: <b style="color:#1db954">Spotify</b></div></div>
   <div id="ytWrap" class="hidden" style="margin-top:8px;border-radius:10px;overflow:hidden"><div id="yt"></div></div>
   <div id="embedWrap" style="margin-top:8px"><div id="embed"></div></div>
   <div class="hint">Sube el volumen y saca el modo silencio. Para escuchar canciones completas, inicia sesión con tu cuenta Premium en open.spotify.com en este mismo navegador; si no, Spotify solo pone 30 segundos.</div>
@@ -706,7 +714,7 @@ $("results").addEventListener("click",e=>{const b=e.target.closest("button");if(
   if(b.dataset.r==="pv"){playPreview(x.previewUrl,b);return;}
   if(b.dataset.r==="add"){
     if(songs.some(s=>s.id===x.trackId)){b.textContent="✓";return;}
-    const s={id:x.trackId,name:`${x.artistName} - ${x.trackName}`,dur:Math.round((x.trackTimeMillis||240000)/1000),bpm:null,art:x.artworkUrl100,preview:x.previewUrl,bpmAuto:false,bpmState:"calc",artist:x.artistName,title:x.trackName,uri:x.uri,artL:x.artL};
+    const s={id:x.trackId,name:`${x.artistName} - ${x.trackName}`,dur:Math.round((x.trackTimeMillis||240000)/1000),bpm:null,art:x.artworkUrl100,preview:x.previewUrl,bpmAuto:false,bpmState:"calc",artist:x.artistName,title:x.trackName,uri:x.uri,artL:x.artL,artistId:x.artistId};
     songs.push(s);plan=[];renderSongs();save();b.textContent="✓";b.disabled=true;
     $("notes").innerHTML='<div class="ok">'+songs.length+' canciones en tu lista.</div>';
     autoBpm(s);
@@ -843,15 +851,15 @@ const _itunes=itunes;
 itunes=async function(term){if(!spLogged())return _itunes(term);
   const d=await spApi("/search?type=track&limit=10&q="+encodeURIComponent(term));
   return {results:(d.tracks&&d.tracks.items||[]).map(t=>({kind:"song",trackId:t.id,trackName:t.name,artistName:t.artists.map(a=>a.name).join(", "),trackTimeMillis:t.duration_ms,
-    artworkUrl100:(t.album.images.slice(-1)[0]||{}).url,artL:(t.album.images[0]||{}).url,previewUrl:null,uri:t.uri}))};};
+    artworkUrl100:(t.album.images.slice(-1)[0]||{}).url,artL:(t.album.images[0]||{}).url,previewUrl:null,uri:t.uri,artistId:t.artists[0]&&t.artists[0].id}))};};
 findYt=async function(){};ensureYt=async function(){};
 // Canciones antiguas sin enlace de Spotify: se buscan solas
 let spEnsuring=false;
 async function spEnsure(){if(!spLogged()||spEnsuring)return;spEnsuring=true;
   for(const s of songs){if(s.uri)continue;
     try{const q=s.name.replace(/\s+-\s+/," ");const d=await spApi("/search?type=track&limit=1&q="+encodeURIComponent(q));const t=d.tracks&&d.tracks.items[0];
-      if(t){s.uri=t.uri;if(!s.art)s.art=(t.album.images.slice(-1)[0]||{}).url;s.artL=(t.album.images[0]||{}).url;}}catch(e){break;}}
-  plan.forEach(p=>{const m=songs.find(x=>x.name===p.name);if(m&&m.uri){p.uri=m.uri;p.artL=m.artL;}});
+      if(t){s.uri=t.uri;if(!s.art)s.art=(t.album.images.slice(-1)[0]||{}).url;s.artL=(t.album.images[0]||{}).url;s.artistId=t.artists[0]&&t.artists[0].id;}}catch(e){break;}}
+  plan.forEach(p=>{const m=songs.find(x=>x.name===p.name);if(m&&m.uri){p.uri=m.uri;p.artL=m.artL;p.artistId=m.artistId;}});
   spEnsuring=false;renderSongs();save();pickMode();}
 // Playlists
 $("btnSpPl").onclick=async()=>{const box=$("spPlList");box.innerHTML='<div class="hint">Cargando tus playlists…</div>';
@@ -866,7 +874,7 @@ $("spPlList").addEventListener("click",async e=>{const b=e.target.closest("butto
     try{const d=await spApi(url);items=d.items||[];}catch(err){const d=await spApi("/playlists/"+b.dataset.pl+"/tracks?limit=100");items=d.items||[];}
     const tr=items.map(it=>it.item||it.track).filter(t=>t&&t.uri&&t.type!=="episode");
     songs=tr.map(t=>({id:t.id,name:`${t.artists.map(a=>a.name).join(", ")} - ${t.name}`,dur:Math.round(t.duration_ms/1000),bpm:null,art:(t.album&&t.album.images.slice(-1)[0]||{}).url,
-      uri:t.uri,artL:(t.album&&t.album.images[0]||{}).url,artist:t.artists[0]&&t.artists[0].name,title:t.name,bpmAuto:false,bpmState:"calc"}));
+      uri:t.uri,artL:(t.album&&t.album.images[0]||{}).url,artistId:t.artists[0]&&t.artists[0].id,artist:t.artists[0]&&t.artists[0].name,title:t.name,bpmAuto:false,bpmState:"calc"}));
     plan=[];renderSongs();save();$("spPlList").innerHTML=`<div class="ok">✅ ${songs.length} canciones cargadas. Revisa los BPM y toca "Ordenar canciones".</div>`;
     for(const s of songs)await autoBpm(s);
   }catch(err){b.textContent="Error";}});
@@ -913,12 +921,27 @@ async function spTick(){if(!playing||mode!=="sp")return;
     spPos=d.progress_ms||0;spTs=performance.now();spPaused=!d.is_playing;if(spPos>4000)spPlayedSome=true;
     if(cur===plan.length-1&&spPaused&&spPlayedSome&&spPos<2000){playing=false;say("Clase terminada. ¡Bien hecho!");}
   }catch(e){}}
+const artistImgCache={};let slideTimer=null,slideList=[],slideK=0,slideLayer=0;
+async function artistImages(p){const fallback=[p.artL||p.art].filter(Boolean);
+  let id=p.artistId;
+  if(!id&&p.uri){try{const t=await spApi("/tracks/"+p.uri.split(":")[2]);id=t.artists[0]&&t.artists[0].id;p.artistId=id;}catch(e){}}
+  if(!id)return fallback;if(artistImgCache[id])return artistImgCache[id];
+  let imgs=[];
+  try{const a=await spApi("/artists/"+id);if(a.images&&a.images[0])imgs.push(a.images[0].url);}catch(e){}
+  try{const al=await spApi("/artists/"+id+"/albums?include_groups=album,single&limit=10");(al.items||[]).forEach(x=>{if(x.images&&x.images[0])imgs.push(x.images[0].url);});}catch(e){}
+  imgs=[...new Set(fallback.concat(imgs))].slice(0,10);artistImgCache[id]=imgs.length?imgs:fallback;return artistImgCache[id];}
+function showSlide(){if(!slideList.length)return;const url=slideList[slideK%slideList.length];slideK++;
+  const nx=$("sl"+(1-slideLayer)),cu=$("sl"+slideLayer);const im=new Image();
+  im.onload=()=>{nx.style.backgroundImage=`url("${url}")`;nx.classList.remove("on");void nx.offsetWidth;nx.classList.add("on");cu.classList.remove("on");slideLayer=1-slideLayer;};im.src=url;}
+async function startSlides(p){clearInterval(slideTimer);slideList=[p.artL||p.art].filter(Boolean);slideK=0;showSlide();
+  const idx=cur;const imgs=await artistImages(p);if(idx!==cur)return;
+  slideList=imgs.length>1?imgs.slice(1).concat(imgs[0]):imgs;slideTimer=setInterval(showSlide,7000);}
 let spVisIdx=-1;
 function spVisUpdate(force){const p=plan[cur];if(!p||!p.b)return;
   if(force||spVisIdx!==cur){spVisIdx=cur;const img=p.artL||p.art||"";$("spArt").src=img;$("spArt").style.visibility=img?"visible":"hidden";$("spBg").style.backgroundImage=img?`url("${img}")`:"none";
     const parts=p.name.split(" - ");$("spTitle").textContent=p.title||parts.slice(1).join(" - ")||p.name;$("spArtist").textContent=p.artist||parts[0]||"";
     $("spBlock").textContent=`${p.b.name} · ${p.cad} rpm · ${p.b.pos}`;const nx=plan[cur+1];$("spNext").textContent=nx?`Siguiente: ${nx.b.name} — ${nx.title||nx.name}`:"Última canción";
-    $("spRing").style.animationDuration=(60/(p.cad||80)).toFixed(3)+"s";}
+    $("spRing").style.animationDuration=(60/(p.cad||80)).toFixed(3)+"s";startSlides(p);}
   const inBlk=Math.max(0,elapsed-blockStart(cur));$("spProg").style.width=Math.min(100,inBlk/p.dur*100)+"%";}
 function spElapsed(){const p=spPos+(spPaused?0:performance.now()-spTs);return blockStart(cur)+Math.min(p/1000,plan[cur].dur-0.05);}
 function spPlayHandler(){const resume=playing===false&&elapsed>0&&elapsed<blockStart(plan.length);playing=true;last=performance.now();
