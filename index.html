@@ -61,6 +61,8 @@ button.sel{outline:3px solid var(--acc);background:#3a2615}
 #live{position:relative}
 #chartTip{position:absolute;z-index:70;pointer-events:none;background:rgba(0,0,0,.88);color:#fff;border:1px solid var(--acc);border-radius:10px;padding:8px 12px;font-size:14px;max-width:260px;transform:translate(-50%,0);box-shadow:0 4px 16px rgba(0,0,0,.5)}
 #chartTip b{font-size:15px}
+#stretchBox:not(.hidden){display:flex}
+#stretchFrame iframe{width:100%;height:100%;border:0}
 .cm-only{display:none}
 body.classmode{overflow:hidden}
 body.classmode .cm-only{display:flex}
@@ -212,6 +214,12 @@ body.classmode.novideo #live{width:100vw}
   </div>
 </section>
 </main>
+<div id="stretchBox" class="hidden" style="position:fixed;inset:0;z-index:90;background:#000;flex-direction:column">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#121212">
+    <b style="font-size:20px">🧘 Estiramiento final</b>
+    <div class="row"><a id="stretchLink" target="_blank" rel="noopener" style="color:var(--acc);align-self:center">Abrir en YouTube</a><button id="btnStretchClose">✕ Cerrar</button></div></div>
+  <div id="stretchFrame" style="flex:1"></div>
+</div>
 
 <script>
 // ---------- Datos de bloques ----------
@@ -379,10 +387,12 @@ function allowedBlocks(){
   return a;
 }
 function posBlock(song,i,n,t,warm){
-  if(n>1&&i<warm)return {k:"calentamiento",c:fitCost(song.bpm,"calentamiento")*0.6};
-  if(n>1&&i===n-1)return {k:"calma",c:fitCost(song.bpm,"calma")*0.6};
+  const eS0=song.energy==null?0.4:song.energy;
+  if(n>1&&i<warm)return {k:"calentamiento",c:fitCost(song.bpm,"calentamiento")*0.6+Math.abs(eS0-0.3)*14};
+  if(n>1&&i===n-1)return {k:"calma",c:fitCost(song.bpm,"calma")*0.6+Math.abs(eS0-0.1)*16};
   let best=null;
-  allowedBlocks().forEach(k=>{const c=Math.abs(blk(k).zone-t[i])*10+fitCost(song.bpm,k)*0.6;if(!best||c<best.c)best={k,c};});
+  const eT=Math.max(0,Math.min(1,(t[i]-1)/3.5)),eS=song.energy==null?eT:song.energy,ec=Math.abs(eS-eT)*14;
+  allowedBlocks().forEach(k=>{const c=Math.abs(blk(k).zone-t[i])*10+fitCost(song.bpm,k)*0.6+ec;if(!best||c<best.c)best={k,c};});
   return best;
 }
 function hungarian(C){const n=C.length,u=Array(n+1).fill(0),v=Array(n+1).fill(0),p=Array(n+1).fill(0),way=Array(n+1).fill(0);
@@ -576,7 +586,7 @@ function tick(now){
   const tot=plan.reduce((a,q)=>a+q.dur,0);if(elapsed>=tot){playing=false;elapsed=tot;}
   const L=locate(elapsed);sel=L.i;setPanels(L.i,L.inBlk);drawChart();
   if(L.i!==lastSpoken){lastSpoken=L.i;announce(L.i);}else coach(L.i,L.inBlk);
-  if(!playing&&mode==="timer"){say("Clase terminada. ¡Bien hecho!");}
+  if(!playing&&mode==="timer"){say("Clase terminada. ¡Bien hecho! Ahora, a estirar.");classEnded();}
   // pulso de cadencia
   const per=60/plan[L.i].cad;beatT+=dt;if(beatT>=per){beatT-=per;beat();}
   requestAnimationFrame(tick);
@@ -584,7 +594,7 @@ function tick(now){
 function beat(){const el=$("pulse");el.classList.add("on");setTimeout(()=>el.classList.remove("on"),90);
   if(clickOn&&actx){try{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=1000;g.gain.setValueAtTime(.25,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.06);o.connect(g).connect(actx.destination);o.start();o.stop(actx.currentTime+.07);}catch(e){}}}
 $("btnPlay").onclick=()=>{unlockAudio();if(!plan.length){build(true);if(!plan.length)return;}lastSpoken=-1;
-  pickMode();enterClass();cues={};
+  pickMode();enterClass();cues={};stretchShown=false;
   if(plan.some(p=>!p.yt)&&songs.some(s=>!s.yt&&s.ytState!=="error")){ensureYt();}
   if(mode==="youtube"){
     if(!ytReady){$("modeMsg").innerHTML="🎬 Cargando el reproductor… toca Iniciar de nuevo en un segundo.";return;}
@@ -648,9 +658,9 @@ function onUpdate(pos,dur,paused){
   }
   if(dur>0&&Math.abs(plan[cur].dur-dur/1000)>1){plan[cur].dur=dur/1000;renderPlan();}
   sync={pos,dur,ts:performance.now(),paused};
-  if(mode==="playlist"&&cur===plan.length-1&&!endedFlag&&pos>3000&&dur>0&&dur-pos<900){endedFlag=true;playing=false;say("Clase terminada. ¡Bien hecho!");try{ctrl.pause()}catch(e){}}
+  if(mode==="playlist"&&cur===plan.length-1&&!endedFlag&&pos>3000&&dur>0&&dur-pos<900){endedFlag=true;playing=false;say("Clase terminada. ¡Bien hecho! Ahora, a estirar.");classEnded();try{ctrl.pause()}catch(e){}}
   if(mode==="track"&&!endedFlag&&pos>3000&&dur>0&&dur-pos<900){endedFlag=true;
-    if(cur<plan.length-1)startTrack(cur+1);else{playing=false;say("Clase terminada. ¡Bien hecho!");}}
+    if(cur<plan.length-1)startTrack(cur+1);else{playing=false;say("Clase terminada. ¡Bien hecho! Ahora, a estirar.");classEnded();}}
 }
 function syncedElapsed(){const p=sync.pos+(sync.paused?0:performance.now()-sync.ts);return blockStart(cur)+Math.min(p,(plan[cur].dur*1000)-1)/1000;}
 
@@ -667,7 +677,20 @@ async function deezerBpm(sg){
   if(!d||!d.data||!d.data.length)d=await jsonp(`https://api.deezer.com/search?q=${enc(artist+" "+title)}&limit=1&output=jsonp`);
   const t=d&&d.data&&d.data[0];if(!t)return null;
   const tr=await jsonp(`https://api.deezer.com/track/${t.id}?output=jsonp`);
+  let genre="";try{const al=tr&&tr.album&&tr.album.id?await jsonp(`https://api.deezer.com/album/${tr.album.id}?output=jsonp`):null;genre=((al&&al.genres&&al.genres.data)||[]).map(g=>g.name).join(" ");}catch(e){}
+  sg.gain=tr&&typeof tr.gain==="number"?tr.gain:sg.gain;if(genre)sg.genre=genre;sg.energy=energyOf(sg);sg.energyChecked=true;
   return tr&&tr.bpm>40?Math.round(tr.bpm):null;}
+function energyOf(sg){const txt=((sg.genre||"")+" "+(sg.name||"")).toLowerCase();const v=[];
+  const G=[[/balad|ballad|romant|bolero|soul|r&b|rnb|jazz|blues|acoust|ac[uú]stic|folk|cl[aá]sic|classical|bossa|lounge|chill|ambient|new age|soundtrack|bandas sonoras|cantautor|songwriter|unplugged|piano/,0.15],
+    [/\bpop\b|latin|reggae\b|country|indie|variété|mpb/,0.45],[/hip.?hop|\brap\b|reggaet|urban|funk|disco|cumbia|salsa|merengue|bachata/,0.65],
+    [/dance|electr|edm|house|techno|trance|drum|dubstep|remix|club/,0.8],[/alternat/,0.7],[/rock|metal|punk|grunge|hard/,0.85]];
+  G.forEach(([re,e])=>{if(re.test(txt))v.push(e);});
+  let g=v.length?v.reduce((a,b)=>a+b,0)/v.length:null;
+  const eg=typeof sg.gain==="number"?Math.max(0,Math.min(1,(sg.gain+13)/7)):null;
+  if(g!=null&&eg!=null)return 0.65*g+0.35*eg;return g!=null?g:eg;}
+async function enrichEnergy(list){const todo=list.filter(x=>!x.energyChecked);if(!todo.length)return;
+  await Promise.race([Promise.all(todo.map(x=>deezerBpm(x).catch(()=>{x.energyChecked=true;}))),new Promise(r=>setTimeout(r,12000))]);
+  list.forEach(x=>{if(x.energy==null)x.energy=energyOf(x);});save();}
 function itunes(term){return new Promise((res,rej)=>{const cb="it"+Date.now()+Math.floor(Math.random()*1e5);const sc=document.createElement("script");
   const done=()=>{try{delete window[cb]}catch(e){window[cb]=undefined}sc.remove();};
   window[cb]=d=>{done();res(d)};sc.onerror=()=>{done();rej("net")};
@@ -688,7 +711,7 @@ $("results").addEventListener("click",e=>{const b=e.target.closest("button");if(
   if(b.dataset.r==="pv"){playPreview(x.previewUrl,b);return;}
   if(b.dataset.r==="add"){
     if(songs.some(s=>s.id===x.trackId)){b.textContent="✓";return;}
-    const s={id:x.trackId,name:`${x.artistName} - ${x.trackName}`,dur:Math.round((x.trackTimeMillis||240000)/1000),bpm:null,art:x.artworkUrl100,preview:x.previewUrl,bpmAuto:false,bpmState:"calc",artist:x.artistName,title:x.trackName};
+    const s={id:x.trackId,name:`${x.artistName} - ${x.trackName}`,dur:Math.round((x.trackTimeMillis||240000)/1000),bpm:null,art:x.artworkUrl100,preview:x.previewUrl,bpmAuto:false,bpmState:"calc",artist:x.artistName,title:x.trackName,genre:x.primaryGenreName||""};
     songs.push(s);plan=[];renderSongs();save();b.textContent="✓";b.disabled=true;
     $("notes").innerHTML='<div class="ok">'+songs.length+' canciones en tu lista.</div>';
     autoBpm(s);
@@ -756,7 +779,7 @@ window.onYouTubeIframeAPIReady=()=>{
   ytP=new YT.Player("yt",{width:"100%",height:"200",playerVars:{playsinline:1,rel:0,modestbranding:1},
     events:{onReady:()=>{ytReady=true},onStateChange:e=>{
       if(e.data===1)$("tapPlay").classList.add("hidden");
-      if(e.data===0&&playing&&mode==="youtube"){if(cur<plan.length-1)ytStart(cur+1);else{playing=false;say("Clase terminada. ¡Bien hecho!");}}
+      if(e.data===0&&playing&&mode==="youtube"){if(cur<plan.length-1)ytStart(cur+1);else{playing=false;say("Clase terminada. ¡Bien hecho! Ahora, a estirar.");classEnded();}}
     }}});
 };
 function ytStart(i){cur=i;sel=i;try{ytP.loadVideoById(plan[i].yt);}catch(e){}
@@ -787,6 +810,14 @@ function importFromHash(){const m=location.hash.match(/^#clase=(.+)$/);if(!m)ret
     setTimeout(()=>$("saved").scrollIntoView({behavior:"smooth",block:"center"}),300);
   }catch(e){alertBox("No pude leer la clase recibida. Pide que te la envíen de nuevo.");}}
 
+// ---------- Estiramiento al terminar la clase ----------
+const STRETCH_VIDEO="5D14SRBV0CQ";let stretchShown=false;
+function classEnded(){if(stretchShown)return;stretchShown=true;setTimeout(showStretch,4500);}
+function showStretch(){try{document.body.classList.remove("classmode","novideo");}catch(e){}
+  $("stretchFrame").innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${STRETCH_VIDEO}?autoplay=1&rel=0&playsinline=1" allow="autoplay; fullscreen; encrypted-media" allowfullscreen></iframe>`;
+  $("stretchLink").href="https://www.youtube.com/watch?v="+STRETCH_VIDEO;$("stretchBox").classList.remove("hidden");}
+$("btnStretchClose").onclick=()=>{$("stretchBox").classList.add("hidden");$("stretchFrame").innerHTML="";try{if(document.fullscreenElement)document.exitFullscreen();}catch(e){}};
+
 // ---------- Mis clases ----------
 function getSaved(){try{return JSON.parse(localStorage.getItem("spin_classes")||"[]")}catch(e){return []}}
 function setSaved(a){try{localStorage.setItem("spin_classes",JSON.stringify(a))}catch(e){$("saved").innerHTML='<div class="warn">Este navegador no deja guardar.</div>'}}
@@ -812,7 +843,9 @@ $("saved").addEventListener("click",e=>{const b=e.target.closest("button");if(!b
 // ---------- Botones principales ----------
 $("btnLoad").onclick=()=>{const nw=parse($("txt").value);songs=songs.concat(nw);$("txt").value="";nw.filter(x=>!x.bpm).forEach(x=>autoBpm(x));if(plUri())loadIntoPlayer(plUri());plan=[];sel=-1;elapsed=0;renderSongs();save();$("notes").innerHTML=songs.length?'<div class="ok">'+songs.length+' canciones cargadas. Revisa los BPM y toca "Ordenar canciones".</div>':"";drawChart();};
 $("btnClear").onclick=()=>{$("txt").value="";$("results").innerHTML="";$("q").value="";songs=[];plan=[];renderSongs();renderPlan();drawChart();$("notes").innerHTML="";save();};
-$("btnBuild").onclick=()=>build(true);
+$("btnBuild").onclick=async()=>{if(!songs.length){build(true);return;}
+  if(songs.some(x=>!x.energyChecked)){$("notes").innerHTML='<div class="ok">🎧 Analizando el estilo de cada canción para ordenarlas mejor…</div>';await enrichEnergy(songs);}
+  build(true);};
 const DEMO=`Luis Fonsi - Despacito 89 3:48
 Pharrell Williams - Happy 160 3:53
 The Weeknd - Blinding Lights 171 3:20
