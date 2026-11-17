@@ -81,6 +81,7 @@ body.classmode #ytWrap.hidden,body.classmode #spVis.hidden{display:none!importan
 #chartTip b{font-size:15px}
 #stretchBox:not(.hidden){display:flex}
 #stretchFrame iframe{width:100%;height:100%;border:0}
+#gate:not(.hidden){display:flex}
 .cm-only{display:none}
 body.classmode{overflow:hidden}
 body.classmode .cm-only{display:flex}
@@ -108,6 +109,7 @@ body.classmode.novideo #live{width:100vw}
   <div class="sub">Pega tus canciones, elige el objetivo y la app las ordena como un profe. Gratis y sin registro.</div>
 </header>
 <main>
+<div id="acctBar" class="hidden row" style="justify-content:space-between;align-items:center;margin:8px 0;font-size:14px;color:var(--mut)"><span>👤 <span id="acctName"></span></span><button id="btnAcctOut" style="min-height:36px;padding:6px 12px">Salir</button></div>
 
 <div class="safety">⚠️ Siempre con calentamiento y vuelta a la calma. Si tienes problemas cardíacos, de presión o alguna lesión, consulta a un médico antes de entrenar.</div>
 
@@ -225,6 +227,13 @@ body.classmode.novideo #live{width:100vw}
   <div class="hint" id="copyMsg"></div>
 </section>
 
+<section id="guestBox" class="hidden">
+  <h2>👥 Invitados</h2>
+  <div class="hint">Solo tú ves esta sección. Agrega el correo de Gmail de quien quieras invitar: podrá entrar con su Google. Si le pasa el enlace a otra persona, a esa persona no la deja entrar.</div>
+  <div class="row"><input id="guestMail" type="email" placeholder="correo@gmail.com" style="flex:1;min-width:200px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px"><button class="pri" id="btnGuestAdd">Invitar</button></div>
+  <div id="guestMsg" class="hint"></div>
+  <div id="guestList" style="margin-top:8px"></div>
+</section>
 <section>
   <h2>💾 Mis clases</h2>
   <div class="hint">Guarda la clase con su playlist para repetirla después con un toque.</div>
@@ -252,6 +261,12 @@ body.classmode.novideo #live{width:100vw}
   </div>
 </section>
 </main>
+<div id="gate" style="position:fixed;inset:0;z-index:100;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;gap:18px">
+  <div style="font-size:30px;font-weight:800">Arma tu clase de <span style="color:var(--acc)">Spinning</span></div>
+  <div id="gateMsg" class="hint" style="font-size:17px;max-width:420px">Cargando…</div>
+  <button id="btnGoogle" class="pri" style="display:none;font-size:18px;padding:14px 22px">Entrar con Google</button>
+  <button id="btnGateOut" style="display:none">Usar otra cuenta</button>
+</div>
 <div id="stretchBox" class="hidden" style="position:fixed;inset:0;z-index:90;background:#000;flex-direction:column">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#121212">
     <b style="font-size:20px">🧘 Estiramiento final</b>
@@ -1010,7 +1025,7 @@ $("btnStretchClose").onclick=()=>{$("stretchBox").classList.add("hidden");$("str
 
 // ---------- Mis clases ----------
 function getSaved(){try{return JSON.parse(localStorage.getItem("spin_classes")||"[]")}catch(e){return []}}
-function setSaved(a){try{localStorage.setItem("spin_classes",JSON.stringify(a))}catch(e){$("saved").innerHTML='<div class="warn">Este navegador no deja guardar.</div>'}}
+function setSaved(a){try{localStorage.setItem("spin_classes",JSON.stringify(a))}catch(e){$("saved").innerHTML='<div class="warn">Este navegador no deja guardar.</div>'}try{syncClassesUp();}catch(e){}}
 function renderSaved(){const a=getSaved();
   $("saved").innerHTML=a.length?a.map((c,i)=>`<div class="song" style="grid-template-columns:1fr auto">
     <div><div class="name">${esc(c.name)}</div><div class="meta">${LEVELS[c.level]?LEVELS[c.level].name:""} · ${GOALS[c.goal]?GOALS[c.goal].name:""} · ${c.n} canciones</div></div>
@@ -1059,5 +1074,61 @@ renderLevels();renderGoals();renderSongs();drawChart();pickMode();renderSaved();
 <script src="https://sdk.scdn.co/spotify-player.js" async></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+// ---------- Acceso con Google (Firebase) ----------
+const FB_CFG={apiKey:"AIzaSyB6571_Us_ImnQ1qggPy_TrqjjupsXcrwU",authDomain:"spinning-514515.firebaseapp.com",projectId:"spinning-514515",storageBucket:"spinning-514515.firebasestorage.app",messagingSenderId:"470833594492",appId:"1:470833594492:web:c9cc685ac9fcb8cefbc9f9"};
+let fbUser=null,fbOwner=false,fbDb=null,fbAuth=null,fbSyncTimer=null;
+function gate(msg,showBtn,showOut){const g=document.getElementById("gate");g.classList.remove("hidden");document.getElementById("gateMsg").innerHTML=msg;
+  document.getElementById("btnGoogle").style.display=showBtn?"":"none";document.getElementById("btnGateOut").style.display=showOut?"":"none";}
+function ungate(){document.getElementById("gate").classList.add("hidden");}
+function fbInit(){
+  if(typeof firebase==="undefined"){gate("No pude cargar el acceso. Revisa tu internet y recarga la página.",false,false);return;}
+  firebase.initializeApp(FB_CFG);fbAuth=firebase.auth();fbDb=firebase.firestore();
+  fbAuth.onAuthStateChanged(async u=>{fbUser=u;
+    if(!u){gate("Esta app es por invitación. Entra con tu cuenta de Google.",true,false);return;}
+    gate("Revisando tu acceso…",false,false);
+    try{
+      const ownRef=fbDb.doc("config/owner");let own=await ownRef.get();
+      if(!own.exists){await ownRef.set({uid:u.uid,email:u.email,since:Date.now()});own=await ownRef.get();}
+      fbOwner=own.data().uid===u.uid;
+      let ok=fbOwner;
+      if(!ok){const a=await fbDb.doc("allowed/"+(u.email||"").toLowerCase()).get();ok=a.exists;}
+      if(!ok){gate(`Hola ${esc(u.displayName||"")}. Tu correo <b>${esc(u.email||"")}</b> todavía no está invitado.<br>Pídele al dueño de la app que te agregue.`,false,true);return;}
+      ungate();document.getElementById("acctBar").classList.remove("hidden");
+      document.getElementById("acctName").textContent=(u.displayName||u.email)+(fbOwner?" · dueño":"");
+      document.getElementById("guestBox").classList.toggle("hidden",!fbOwner);if(fbOwner)renderGuests();
+      await syncClassesDown();
+    }catch(e){gate("No pude revisar tu acceso ("+esc(e.code||e.message||"error")+"). Si eres el dueño, revisa que las reglas de la base de datos estén publicadas.",false,true);}
+  });
+}
+async function fbSignIn(){const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});
+  try{await fbAuth.signInWithPopup(p);}catch(e){if(/popup|operation-not-supported/.test(e.code||""))await fbAuth.signInWithRedirect(p);else gate("No pude entrar ("+esc(e.code||"error")+"). Intenta de nuevo.",true,false);}}
+document.getElementById("btnGoogle").onclick=fbSignIn;
+document.getElementById("btnGateOut").onclick=()=>fbAuth&&fbAuth.signOut();
+document.getElementById("btnAcctOut").onclick=()=>fbAuth&&fbAuth.signOut();
+// Invitados (solo dueño)
+async function renderGuests(){const box=document.getElementById("guestList");
+  try{const q=await fbDb.collection("allowed").get();const list=q.docs.map(d=>d.id).sort();
+    box.innerHTML=list.length?list.map(m=>`<div class="song" style="grid-template-columns:1fr auto"><div class="name">${esc(m)}</div><button data-del="${esc(m)}">✕ Quitar</button></div>`).join(""):'<div class="hint">Todavía no invitas a nadie.</div>';
+  }catch(e){box.innerHTML='<div class="warn">No pude leer la lista de invitados.</div>';}}
+document.getElementById("btnGuestAdd").onclick=async()=>{const m=(document.getElementById("guestMail").value||"").trim().toLowerCase();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m)){document.getElementById("guestMsg").textContent="Escribe un correo válido (el de Gmail de tu invitada).";return;}
+  try{await fbDb.doc("allowed/"+m).set({by:fbUser.email,at:Date.now()});document.getElementById("guestMail").value="";
+    document.getElementById("guestMsg").textContent="✅ Listo: "+m+" ya puede entrar con su Google.";renderGuests();}
+  catch(e){document.getElementById("guestMsg").textContent="No pude agregarlo ("+(e.code||"error")+").";}};
+document.getElementById("guestList").addEventListener("click",async e=>{const b=e.target.closest("button[data-del]");if(!b)return;
+  try{await fbDb.doc("allowed/"+b.dataset.del).delete();renderGuests();}catch(err){}});
+// Clases sincronizadas entre aparatos
+async function syncClassesDown(){if(!fbUser)return;try{const d=await fbDb.doc("users/"+fbUser.uid).get();
+  const remote=(d.exists&&d.data().classes)||[];const local=getSaved();const key=c=>JSON.stringify([c.name,c.level,c.goal,(c.songs||[]).map(s=>s.name)]);
+  const seen=new Set(),merged=[];[...local,...remote].forEach(c=>{const k=key(c);if(!seen.has(k)){seen.add(k);merged.push(c);}});
+  try{localStorage.setItem("spin_classes",JSON.stringify(merged))}catch(e){}renderSaved();syncClassesUp();}catch(e){}}
+function syncClassesUp(){if(!fbUser||!fbDb)return;clearTimeout(fbSyncTimer);fbSyncTimer=setTimeout(()=>{
+  fbDb.doc("users/"+fbUser.uid).set({classes:getSaved(),updated:Date.now()}).catch(()=>{});},800);}
+window.addEventListener("load",fbInit);
+</script>
 </body>
 </html>
