@@ -254,10 +254,10 @@ body.classmode.novideo #live{width:100vw}
   <div class="hint" style="font-size:15px;color:var(--txt)">
   <b>Zona de potencia:</b> % de tu FTP (la potencia que aguantas ~1 hora). Sin potenciómetro, guíate por el esfuerzo.<br>
   <b>Zona de FC:</b> % de tu frecuencia cardíaca máxima (estimación simple: 220 − edad).<br>
-  <b>Cadencia:</b> pedaladas por minuto. Llano 80–100, subida 60–75, sprint 100–115.<br>
+  <b>Cadencia:</b> pedaladas por minuto. Llano 80–110, subida 60–80, sprint 100–120, recuperación 70–90.<br>
   <b>Resistencia:</b> la perilla. A menos cadencia, más resistencia. Nunca pedalees muy rápido sin carga (rebotas y te puedes lesionar).<br>
   <b>BPM → cadencia:</b> una pedalada por beat (90 BPM = 90 rpm) o una cada dos beats (128 BPM = 64 rpm, subida).<br>
-  <b>Esfuerzo (1–10):</b> Muy ligero 1–2 · Ligero 3–4 · Moderado 5–6 · Intenso 7–8 · Máximo 9–10.
+  <b>Esfuerzo (1–10):</b> cómo se siente, igual en cualquier bici: 2 muy ligero · 4 moderado · 6 algo duro · 8 muy duro · 9–10 máximo. La resistencia se indica con la misma escala.<br><b>Seguridad:</b> nunca bajo 60 rpm (cargas las rodillas) ni sobre 120 rpm (la rueda te lleva a ti).
   </div>
 </section>
 </main>
@@ -277,15 +277,15 @@ body.classmode.novideo #live{width:100vw}
 <script>
 // ---------- Datos de bloques ----------
 const BLOCKS = {
-  calentamiento:{name:"Calentamiento",zone:1.5,zoneTxt:"50-65%",cad:[85,95],eff:"Muy ligero → Ligero",pos:"Sentado",res:"Baja, subiendo de a poco",rest:false},
-  llano:{name:"Llano",zone:2,zoneTxt:"56-75%",cad:[85,100],eff:"Moderado",pos:"Sentado",res:"Media-baja",rest:false},
-  tempo:{name:"Tempo",zone:3,zoneTxt:"76-90%",cad:[80,92],eff:"Moderado-Intenso",pos:"Sentado",res:"Media",rest:false},
-  subida:{name:"Subida",zone:3.6,zoneTxt:"80-95%",cad:[60,75],eff:"Intenso",pos:"Sentado / De pie",res:"Alta",rest:false},
-  fuerza:{name:"Fuerza glúteo",zone:3.8,zoneTxt:"85-95%",cad:[55,65],eff:"Intenso",pos:"De pie, cadera atrás",res:"Muy alta",rest:false},
-  umbral:{name:"Umbral",zone:4,zoneTxt:"91-105%",cad:[85,95],eff:"Intenso",pos:"Sentado",res:"Media-alta",rest:false},
-  sprint:{name:"Sprint / HIIT",zone:5,zoneTxt:">105%",cad:[100,115],eff:"Máximo",pos:"Sentado / De pie",res:"Media (con carga)",rest:false},
-  recuperacion:{name:"Recuperación",zone:1,zoneTxt:"<55%",cad:[80,90],eff:"Muy ligero",pos:"Sentado",res:"Baja",rest:true},
-  calma:{name:"Vuelta a la calma",zone:1,zoneTxt:"<55%",cad:[70,85],eff:"Muy ligero",pos:"Sentado + estirar",res:"Muy baja",rest:true}
+  calentamiento:{name:"Calentamiento",zone:1.5,zoneTxt:"50-65%",cad:[80,90],eff:"3/10 · Ligero",pos:"Sentado",res:"Baja, subiendo de a poco (2–4/10)",rest:false},
+  llano:{name:"Llano",zone:2,zoneTxt:"56-75%",cad:[80,110],eff:"4/10 · Moderado",pos:"Sentado",res:"Media-baja (3–5/10)",rest:false},
+  tempo:{name:"Tempo",zone:3,zoneTxt:"76-90%",cad:[80,100],eff:"6/10 · Algo duro",pos:"Sentado",res:"Media (5–6/10)",rest:false},
+  subida:{name:"Subida",zone:3.6,zoneTxt:"80-95%",cad:[60,80],eff:"7/10 · Duro",pos:"Sentado / De pie",res:"Alta (6–9/10)",rest:false},
+  fuerza:{name:"Fuerza glúteo",zone:3.8,zoneTxt:"85-95%",cad:[60,68],eff:"8/10 · Muy duro",pos:"De pie, cadera atrás",res:"Muy alta (8–9/10)",rest:false},
+  umbral:{name:"Umbral",zone:4,zoneTxt:"91-105%",cad:[85,100],eff:"8/10 · Muy duro",pos:"Sentado",res:"Media-alta (6–7/10)",rest:false},
+  sprint:{name:"Sprint / HIIT",zone:5,zoneTxt:">105%",cad:[100,120],eff:"9/10 · Máximo",pos:"Sentado / De pie",res:"Media con carga (4–6/10)",rest:false},
+  recuperacion:{name:"Recuperación",zone:1,zoneTxt:"<55%",cad:[70,90],eff:"2/10 · Muy ligero",pos:"Sentado",res:"Baja (2–3/10)",rest:true},
+  calma:{name:"Vuelta a la calma",zone:1,zoneTxt:"<55%",cad:[70,85],eff:"2/10 · Muy ligero",pos:"Sentado + estirar",res:"Mínima (1–2/10)",rest:true}
 };
 const GOALS = {
   grasa:{name:"Quemar grasa",d:"Mucho tiempo en Z2–Z3 con picos",pat:["llano","tempo","subida","llano","tempo","recuperacion"]},
@@ -302,10 +302,10 @@ const LEVELS={
   avanzado:{name:"Avanzado",d:"Menos descanso, más tiempo en zona alta"}
 };
 const BEGIN_OVR={
-  subida:{zone:3,zoneTxt:"70-80%",cad:[65,78],eff:"Moderado",pos:"Sentado",res:"Media (puedes hablar entrecortado)"},
-  tempo:{zone:2.6,zoneTxt:"70-80%",cad:[80,92],eff:"Moderado"},
-  llano:{zone:2,zoneTxt:"56-70%",cad:[80,95],eff:"Ligero-Moderado"},
-  calentamiento:{cad:[80,95]},
+  subida:{zone:3,zoneTxt:"70-80%",cad:[65,80],eff:"6/10 · Moderado-duro",pos:"Sentado",res:"Media (5–6/10, puedes hablar entrecortado)"},
+  tempo:{zone:2.6,zoneTxt:"70-80%",cad:[80,95],eff:"5/10 · Moderado"},
+  llano:{zone:2,zoneTxt:"56-70%",cad:[80,100],eff:"4/10 · Moderado"},
+  calentamiento:{cad:[80,90]},
   calma:{cad:[70,85]}
 };
 function blk(k){return level==="principiante"&&BEGIN_OVR[k]?{...BLOCKS[k],...BEGIN_OVR[k]}:BLOCKS[k];}
@@ -317,7 +317,7 @@ const $=id=>document.getElementById(id);
 const fmt=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
 function cadFromBpm(b,target){
   if(!b) return null;
-  const c=[b,b/2,b*2].filter(x=>x>=50&&x<=120);
+  const c=[b,b/2,b*2].filter(x=>x>=60&&x<=120);
   if(!c.length) return null;
   if(!target) return Math.round(c[0]);
   const mid=(target[0]+target[1])/2;
@@ -360,6 +360,7 @@ function renderSongs(){
        ${s.preview?`<button data-a="pl" data-i="${i}" title="Escuchar">▶</button>`:""}
        <button data-a="m" data-i="${i}">−</button><span class="v ${s.bpm?"":"miss"}">${s.bpm?(s.bpmAuto?"≈":"")+s.bpm:"?"}</span><button data-a="p" data-i="${i}">+</button>
        <button data-a="t" data-i="${i}" title="Tap tempo">Tap</button>
+       <a href="https://www.google.com/search?q=${encodeURIComponent("songbpm "+s.name.replace(/\s+-\s+/," "))}" target="_blank" rel="noopener" title="Revisar el BPM en songbpm.com" style="text-decoration:none"><button tabindex="-1">🔎</button></a>
        <button data-a="u" data-i="${i}" title="Subir">↑</button><button data-a="d" data-i="${i}" title="Bajar">↓</button>
        <button data-a="x" data-i="${i}" title="Quitar">✕</button>
      </div>
@@ -377,7 +378,7 @@ window.addEventListener("pointerup",()=>{if(!drag)return;const box=$("songs");
   const idx=[...box.querySelectorAll(".song")].map(r=>+r.dataset.i);songs=idx.map(i=>songs[i]);drag=null;afterReorder();});
 function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 $("songs").addEventListener("click",e=>{
-  const b=e.target.closest("button"); if(!b) return; const i=+b.dataset.i, a=b.dataset.a;
+  const b=e.target.closest("button"); if(!b||!b.dataset.a) return; const i=+b.dataset.i, a=b.dataset.a;
   if(a==="m"){songs[i].bpm=Math.max(50,(songs[i].bpm||120)-1);songs[i].bpmAuto=false;}
   if(a==="p"){songs[i].bpm=Math.min(220,(songs[i].bpm||120)+1);songs[i].bpmAuto=false;}
   if(a==="x"){songs.splice(i,1);}
@@ -422,11 +423,12 @@ function targetCurve(n){
   for(let i=0;i<warm;i++)t.push(i===0?1.5:1.8);
   const m=Math.max(0,n-warm-1);
   for(let k=0;k<m;k++){const u=(k+0.5)/m;let v;
-    if(goal==="grasa")v=2.2+1.2*Math.sin(Math.PI*u)+0.45*Math.sin(5*Math.PI*u);
-    else if(goal==="resistencia")v=u<0.15?2+6*u:3.1+0.6*Math.sin(Math.PI*u);
+    const ph=u<=0.7?0.5*u/0.7:0.5+0.5*(u-0.7)/0.3; // punto más alto al 70% de la clase
+    if(goal==="grasa")v=2.2+1.3*Math.sin(Math.PI*ph)+0.35*Math.sin(5*Math.PI*u);
+    else if(goal==="resistencia")v=u<0.15?2+6*u:3.1+0.7*Math.sin(Math.PI*ph);
     else if(goal==="gluteo")v=(k%3===2)?1.5:3.7;
     else if(goal==="hiit")v=(k%2===0)?4.8:1.2;
-    else v=1.6+0.4*Math.sin(Math.PI*u);
+    else v=1.6+0.4*Math.sin(Math.PI*ph);
     if(level==="principiante")v=Math.min(3,1.3+(v-1)*0.55);
     if(level==="avanzado")v=Math.min(5,v+0.3);
     if(goal!=="hiit"&&goal!=="gluteo"){const ramp=(level==="principiante"?1.9:2.1)+k*(level==="principiante"?0.45:0.6);v=Math.min(v,ramp);}
