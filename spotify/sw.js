@@ -1,6 +1,6 @@
 /* Spinning · Spotify: guarda solo la pantalla para abrir sin conexión.
    No intercepta Spotify, Firebase, YouTube ni ningún otro servicio externo. */
-const CACHE = 'spinning-spotify-v1';
+const CACHE = 'spinning-spotify-v2';
 const CORE = ['./', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));

@@ -129,7 +129,8 @@ body.classmode.novideo #live{width:100vw}
       <div id="spPlList" style="margin-top:8px"></div>
       <div class="hint" style="margin-top:8px">🔊 ¿Dónde suena la música?</div>
       <div class="row"><select id="spDev" style="flex:1;min-width:200px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px"></select><button id="btnSpDev">🔄</button><button id="btnSpVol" title="Subir el volumen de Spotify al máximo">🔊 Máx</button></div>
-      <div class="hint" id="spDevHint">En el computador suena aquí mismo. En el celular, abre la app de Spotify una vez y toca 🔄. Tu Chromecast también aparece en la lista si Spotify lo ve.</div>
+      <button id="btnSpWake" class="hidden" style="width:100%;margin-top:8px;background:#1db954;color:#000;font-weight:700">📱 Hacer sonar en mi celular</button>
+      <div class="hint" id="spDevHint">En el computador suena aquí mismo. En el celular la música sale por la app de Spotify: toca el botón verde y vuelve. Tu Chromecast también aparece en la lista si Spotify lo ve.</div>
       <div id="spStat" class="hint" style="color:#9fe0b2"></div>
     </div>
   </div>
@@ -949,10 +950,23 @@ $("spPlList").addEventListener("click",async e=>{const b=e.target.closest("butto
     for(const s of songs)await autoBpm(s);
   }catch(err){b.textContent="Error";}});
 // Dispositivos
+const spMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+let spWakeTimer=null,spPendingPlay=null;
 async function spDevices(){try{const d=await spApi("/me/player/devices");const sel=$("spDev");const prev=sel.value;
-  const list=(d.devices||[]);sel.innerHTML=list.length?list.map(x=>`<option value="${x.id}">${x.id===spWebDev?"💻 Este navegador":(x.type==="Smartphone"?"📱 ":x.type==="CastVideo"||x.type==="TV"||x.type==="CastAudio"?"📺 ":"🔈 ")+esc(x.name)}${x.is_active?" (activo)":""}</option>`).join(""):'<option value="">No veo dispositivos: abre Spotify en tu celular y toca 🔄</option>';
-  if(prev&&list.some(x=>x.id===prev))sel.value=prev;else{const a=list.find(x=>x.id===spWebDev)||list.find(x=>x.is_active);if(a)sel.value=a.id;}}catch(e){}}
-$("btnSpDev").onclick=spDevices;$("btnSpVol").onclick=()=>{spVol(100);spStat("volumen de Spotify al máximo");};
+  const list=(d.devices||[]);const real=list.filter(x=>x.id!==spWebDev);
+  sel.innerHTML=list.length?list.map(x=>`<option value="${x.id}">${x.id===spWebDev?(spMobile?"💻 Este navegador (en el celular no suena)":"💻 Este navegador"):(x.type==="Smartphone"?"📱 ":x.type==="CastVideo"||x.type==="TV"||x.type==="CastAudio"?"📺 ":"🔈 ")+esc(x.name)}${x.is_active?" (activo)":""}</option>`).join(""):'<option value="">No veo dispositivos: toca el botón verde de abajo</option>';
+  const okPrev=prev&&list.some(x=>x.id===prev)&&!(spMobile&&prev===spWebDev);
+  if(okPrev)sel.value=prev;else{const a=(spMobile?(real.find(x=>x.type==="Smartphone")||real.find(x=>x.is_active)||real[0]):(list.find(x=>x.id===spWebDev)||list.find(x=>x.is_active)));if(a)sel.value=a.id;}
+  try{$("btnSpWake").classList.toggle("hidden",!(spMobile&&!real.length));}catch(e){}
+  if(real.length&&spWakeTimer){clearInterval(spWakeTimer);spWakeTimer=null;spStat("listo: "+(sel.selectedOptions[0]?sel.selectedOptions[0].textContent:"dispositivo")+" ✔");
+    if(spPendingPlay!==null){const k=spPendingPlay;spPendingPlay=null;spPlayFrom(k);}}
+  return real;}catch(e){return [];}}
+function spWake(){const s0=(plan[0]&&plan[0].uri)||(songs.find(x=>x.uri)||{}).uri||"";
+  spStat("abriendo Spotify… cuando se abra, vuelve a esta app (si no aparece tu celular, dale play y pausa a cualquier canción en Spotify)");
+  clearInterval(spWakeTimer);let n=0;spWakeTimer=setInterval(()=>{if(++n>45){clearInterval(spWakeTimer);spWakeTimer=null;spStat("no vi tu celular. Abre Spotify, pon play a una canción, vuelve y toca 🔄");return;}spDevices();},2000);
+  location.href=s0?s0:"spotify:";}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&spLogged())spDevices();});
+$("btnSpDev").onclick=spDevices;$("btnSpWake").onclick=spWake;$("btnSpVol").onclick=()=>{spVol(100);spStat("volumen de Spotify al máximo");};
 window.onSpotifyWebPlaybackSDKReady=()=>{spSdkReady=true;spMakePlayer();};
 function spMakePlayer(){if(!spSdkReady||!spLogged()||spPlayer)return;
   spPlayer=new Spotify.Player({name:"Spinning (navegador)",getOAuthToken:cb=>{spToken().then(cb).catch(()=>{})},volume:1});
@@ -975,7 +989,8 @@ async function spPlayFrom(i){cur=i;sel=i;spPos=0;spTs=performance.now();spPaused
   try{spPlayer&&spPlayer.activateElement&&spPlayer.activateElement();}catch(e){}
   let dev=$("spDev").value||spWebDev||"";
   spStat("buscando dónde sonar…");if(!dev){await spDevices();dev=$("spDev").value||spWebDev||"";}
-  if(!dev){spStat("no hay dónde reproducir: espera unos segundos a que aparezca 'Este navegador' o abre Spotify en el celular, y toca 🔄");return;}
+  if(spMobile&&dev===spWebDev){const r=await spDevices();dev=r.length?$("spDev").value:"";}
+  if(!dev){spPendingPlay=i;try{$("btnSpWake").classList.remove("hidden");}catch(e){}spStat(spMobile?"toca el botón verde «Hacer sonar en mi celular»: se abre Spotify, vuelves y la clase parte sola":"no hay dónde reproducir: espera a que aparezca 'Este navegador' o abre Spotify y toca 🔄");return;}
   spStat("enviando la música…");
   try{await spApi("/me/player",{method:"PUT",body:JSON.stringify({device_ids:[dev],play:false})});}catch(e){}
   await new Promise(r=>setTimeout(r,400));
