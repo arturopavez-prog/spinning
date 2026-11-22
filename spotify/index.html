@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Spinning · Spotify</title>
 <meta name="theme-color" content="#121212">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png">
 <style>
 :root{
   --bg:#121212;--card:#1e1e1e;--card2:#262626;--txt:#f2f2f2;--mut:#a8a8a8;--acc:#ff7a1a;--line:#333;
@@ -1142,5 +1144,6 @@ function syncClassesUp(){if(!fbUser||!fbDb)return;clearTimeout(fbSyncTimer);fbSy
   fbDb.doc("users/"+fbUser.uid).set({classes:getSaved(),updated:Date.now()}).catch(()=>{});},800);}
 window.addEventListener("load",fbInit);
 </script>
+<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));}</script>
 </body>
 </html>
